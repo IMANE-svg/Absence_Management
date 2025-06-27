@@ -1,0 +1,59 @@
+.gestion-container {
+  padding: 20px;
+  background-color: #fefaf0;
+  font-family: 'Segoe UI', sans-serif;
+  color: #1e1e1e;
+}
+
+h2 {
+  margin-bottom: 20px;
+}
+
+.add-button {
+  background-color: #8b4c39;
+  color: white;
+  padding: 10px 16px;
+  font-size: 16px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.add-button:hover {
+  background-color: #a55742;
+}
+
+.enseignant-form {
+  margin-top: 20px;
+  background-color: #fff9f3;
+  padding: 20px;
+  border: 1px solid #d2c4ba;
+  border-radius: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  max-width: 800px;
+}
+
+.enseignant-form input,
+.enseignant-form select,
+.enseignant-form button {
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+  flex: 1 1 200px;
+}
+
+.enseignant-form button[type='submit'] {
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  cursor: pointer;
+  flex: 1 1 100px;
+}
+
+.enseignant-form button[type='submit']:hover {
+  background-color: #43a047;
+}

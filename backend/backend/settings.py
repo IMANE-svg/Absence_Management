@@ -28,9 +28,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'rest_framework',
     'rest_framework.authtoken',
-    'api',   
-    'admin',
-    'core',
+    'api', 
 ]
 
 MIDDLEWARE = [
@@ -121,9 +119,9 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-AUTH_USER_MODEL = 'api.Enseignant'
+AUTH_USER_MODEL = 'api.User'
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
+    "http://localhost:3000",
     
 ]
 CORS_ALLOW_ALL_ORIGINS = True
@@ -151,3 +149,7 @@ REST_FRAMEWORK = {
         'rest_framework.parsers.MultiPartParser',
     ],
 }
+
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+]
