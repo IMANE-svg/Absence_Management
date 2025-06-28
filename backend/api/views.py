@@ -74,7 +74,7 @@ class LoginView(APIView):
     
 class GenerateQRCodeAPI(APIView):
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def post(self, request):
         # Verify user is an Enseignant
@@ -116,7 +116,7 @@ class GenerateQRCodeAPI(APIView):
     
 class SessionViewSet(viewsets.ModelViewSet):
     serializer_class = SessionSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get_queryset(self):
         # Ne retourner que les séances de l’enseignant connecté
@@ -126,7 +126,7 @@ class SessionViewSet(viewsets.ModelViewSet):
         serializer.save(enseignant=self.request.user)
 
 class DashboardView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request):
         user = request.user
@@ -191,7 +191,7 @@ class DashboardView(APIView):
 
             
 class ProfileAPI(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     # Get current email
     def get(self, request):
@@ -207,7 +207,7 @@ class ProfileAPI(APIView):
         return Response(serializer.errors, status=400)
 
 class PasswordAPI(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     # Update password
     def post(self, request):
@@ -224,7 +224,7 @@ class PasswordAPI(APIView):
     
     
 class HelpRequestAPI(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def post(self, request):
         data = {
@@ -281,7 +281,7 @@ def get_absences(request):
 
 class AdminEnseignantViewSet(viewsets.ModelViewSet):
     queryset = Enseignant.objects.select_related('user').all()
-    permission_classes = [IsAdminUser]
+    permission_classes = [AllowAny]
 
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
@@ -310,7 +310,7 @@ class AdminEnseignantViewSet(viewsets.ModelViewSet):
 
 
 class AdminHelpResponseView(APIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = [AllowAny]
 
     def post(self, request, pk):
         help_request = get_object_or_404(HelpRequest, pk=pk)
@@ -327,7 +327,7 @@ class AdminHelpResponseView(APIView):
         return Response({'status': 'Réponse enregistrée avec succès.'})
     
 class AdminHelpListView(APIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = [AllowAny]
 
     def get(self, request):
         help_requests = HelpRequest.objects.all().order_by('-created_at')
@@ -335,7 +335,7 @@ class AdminHelpListView(APIView):
         return Response(serializer.data)
 
 class QRNotificationView(APIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = [AllowAny]
     
     def get(self, request):
         unread = QRNotification.objects.filter(viewed=False).select_related('enseignant', 'session')
@@ -389,7 +389,7 @@ class PendingEnseignantViewSet(viewsets.ModelViewSet):
 
 class AdminDashboardStatsView(APIView):
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request):
         total_enseignants = Enseignant.objects.count()  
@@ -405,7 +405,7 @@ class AdminDashboardStatsView(APIView):
     
 class ExportEnseignantsExcel(APIView):
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAdminUser]
+    permission_classes = [AllowAny]
 
     def get(self, request):
         enseignants = Enseignant.objects.all().values(
@@ -420,7 +420,7 @@ class ExportEnseignantsExcel(APIView):
     
 class ExportEtudiantsExcel(APIView):
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAdminUser]
+    permission_classes = [AllowAny]
 
     def get(self, request):
         etudiants = Etudiant.objects.all().values(
@@ -435,7 +435,7 @@ class ExportEtudiantsExcel(APIView):
     
 class ExportMatieresExcel(APIView):
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAdminUser]
+    permission_classes = [AllowAny]
 
     def get(self, request):
         matieres = Matiere.objects.all().values('id', 'nom', 'enseignant__nom')
@@ -448,7 +448,7 @@ class ExportMatieresExcel(APIView):
     
 class ExportAbsencesExcel(APIView):
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAdminUser]
+    permission_classes = [AllowAny]
 
     def get(self, request):
         absences = Presence.objects.select_related('etudiant', 'session').values(

@@ -40,7 +40,7 @@ urlpatterns = [
     # Aide
     path('my-help-requests/', HelpRequestAPI.as_view()),
     path('help-requests/', AdminHelpListView.as_view()),
-    path('help-requests/<int:pk>/respond/', AdminHelpResponseView.as_view()),
+    path('help-requests/respond/', AdminHelpResponseView.as_view()),
 
     # Absences
     path('absences/', get_absences, name='get_absences'),
