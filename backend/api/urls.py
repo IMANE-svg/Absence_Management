@@ -2,14 +2,20 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from .views import (
-    EnseignantSignupView,LoginView, GenerateQRCodeAPI,
+    EnseignantSignupView,CustomTokenObtainPairView, GenerateQRCodeAPI,
     ProfileAPI, PasswordAPI, AdminHelpResponseView,
     get_absences, AdminEnseignantViewSet, QRNotificationView, FiliereViewSet, MatiereViewSet, 
     NiveauViewSet,DashboardView, PendingEnseignantViewSet, AdminHelpListView, AdminDashboardStatsView,SalleViewSet,
-    SessionViewSet, HelpRequestAPI, ExportAbsencesExcel, ExportEnseignantsExcel,ExportEtudiantsExcel,ExportMatieresExcel
+    SessionViewSet, HelpRequestAPI, ExportAbsencesExcel, ExportEnseignantsExcel,ExportEtudiantsExcel,ExportMatieresExcel,
+    RegisterEtudiantView, logout_view, enregistrer_presence_scan, get_student_presences,student_profile_view,generer_rapport_presence,
+    telecharger_rapport_excel
 )
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.routers import DefaultRouter
+from rest_framework_simplejwt.views import(
+    
+    TokenRefreshView,
+)
 
 router = DefaultRouter()
 
@@ -24,9 +30,11 @@ router.register(r'salles', SalleViewSet)
 
 
 urlpatterns = [
+    path('token/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     # Auth
     path('signup/enseignant/', EnseignantSignupView.as_view()),
-    path('login/', LoginView.as_view(), name='login'),
+    #path('login/', LoginView.as_view(), name='login'),
     path('admin/dashboard-stats/', AdminDashboardStatsView.as_view(), name='admin-dashboard-stats'),
 
     # Profile et mot de passe
@@ -40,10 +48,12 @@ urlpatterns = [
     # Aide
     path('my-help-requests/', HelpRequestAPI.as_view()),
     path('help-requests/', AdminHelpListView.as_view()),
-    path('help-requests/respond/', AdminHelpResponseView.as_view()),
+    path('help-requests/respond/<int:pk>', AdminHelpResponseView.as_view()),
 
     # Absences
     path('absences/', get_absences, name='get_absences'),
+    path('rapport-presence/', generer_rapport_presence),
+    path('rapport-excel/', telecharger_rapport_excel),
 
     # Pending enseignants
     path('pending-enseignants/<int:pk>/validate/', PendingEnseignantViewSet.as_view({'post': 'validate'})),
@@ -53,6 +63,16 @@ urlpatterns = [
     path("admin/export/matieres/", ExportMatieresExcel.as_view(), name='export-matieres'),
     path('admin/export/etudiants', ExportEtudiantsExcel.as_view(), name = 'export-etudiants'),
     path("admin/export/absences", ExportAbsencesExcel.as_view(), name ='export-absences'),
+    
+    # Etudiant 
+    path('signup/etudiant/', RegisterEtudiantView.as_view(), name='etudiant_signup'),
+    
+    path('logout/', logout_view, name='logout'),
+
+    path('presences/scan/', enregistrer_presence_scan, name='presence_scan'),
+    path('presences/', get_student_presences, name='student_presences'),
+
+    path('etudiant/profil/', student_profile_view, name='student_profile'),
     # Routes des ViewSets via le router
     path('', include(router.urls)),
     

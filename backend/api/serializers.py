@@ -1,7 +1,8 @@
 from rest_framework import serializers
-from .models import User,PendingEnseignant, Enseignant, Session, HelpRequest, Presence, Filiere, Matiere, Niveau, Salle
+from .models import User,Etudiant,PendingEnseignant, Enseignant, Session, HelpRequest, Presence, Filiere, Matiere, Niveau, Salle
 from django.contrib.auth import authenticate
-
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+import re
 
 #====================================Users========================================================
 class UserSerializer(serializers.ModelSerializer):
@@ -46,23 +47,74 @@ class EnseignantSignupSerializer(serializers.Serializer):
 
         return user
 
-class LoginSerializer(serializers.Serializer):
-    email = serializers.EmailField()
-    password = serializers.CharField()
+########################Fhad serializer zdt ta etudiant 7it hada li khdam f simplejwt    
 
-    def validate(self, data):
-        user = authenticate(username=data['email'], password=data['password'])
-        if not user:
-            raise serializers.ValidationError("Identifiants invalides")
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        user = self.user
+
+        # Ajoute des infos personnalisées à la réponse
+        data['role'] = user.role
+        data['email'] = user.email
+
+        # Redirection selon le rôle
+        if user.role == 'admin':
+            data['redirect_to'] = '/admin/dashboard'
+        elif user.role == 'enseignant':
+            data['redirect_to'] = '/enseignant/dashboard'
+        elif user.role == 'etudiant':
+            data['redirect_to'] = '/(main)/scan-qr'  # utilisé côté mobile
+        else:
+            data['redirect_to'] = '/'
+
+        return data
+
+##################Hada ghi serializer dyalk
+
+class EtudiantRegisterSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
+    nom = serializers.CharField()
+    prenom = serializers.CharField()
+    niveau = serializers.CharField()
+    filiere = serializers.CharField()
+    photo = serializers.ImageField(required=False)
+
+    def validate_email(self, value):
+        if not re.match(r'^[a-zA-Z0-9_.+-]+@ump\.ac\.ma$', value):
+            raise serializers.ValidationError("L'email doit être un email académique UMP (ex: nom.prenom@ump.ac.ma)")
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("Un compte avec cet email existe déjà.")
+        return value
+
+    
+
+    def create(self, validated_data):
+        password = validated_data.pop('password')
         
-        # Si enseignant : vérifier l'activation
-        if user.role == 'enseignant' and not user.is_active:
-            raise serializers.ValidationError("Votre compte enseignant est en attente de validation.")
-        
-        return user
+
+        user = User.objects.create_user(
+            email=validated_data['email'],
+            password=password,
+            role='etudiant'
+        )
+
+        etudiant = Etudiant.objects.create(
+            user=user,
+            nom=validated_data['nom'],
+            prenom=validated_data['prenom'],
+            niveau=validated_data['niveau'],
+            filiere=validated_data['filiere'],
+            photo=validated_data.get('photo')
+        )
+
+        return etudiant
+
 
     
 #================================================Cote Enseignant====================================================
+
 
 class EnseignantProfileSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source='user.email')
@@ -70,17 +122,24 @@ class EnseignantProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Enseignant
         fields = ['email', 'prenom', 'nom', 'statut']
+        
+#################Serializer dseance ############################################
 
 class SessionSerializer(serializers.ModelSerializer):
+    filiere = serializers.CharField(source='matiere.filiere.nom', read_only=True)
+    niveau = serializers.CharField(source='matiere.niveau.nom', read_only=True)
+    module = serializers.CharField(source='matiere.nom', read_only=True)
+
     class Meta:
         model = Session
         fields = [
             'id',
             'type_seance',
-            'module',
-            'salle',
-            'filiere',
-            'niveau',
+            'matiere',     
+            'module',      
+            'salle',       
+            'filiere',     
+            'niveau',      
             'jour',
             'heure_debut',
             'heure_fin',
@@ -88,38 +147,31 @@ class SessionSerializer(serializers.ModelSerializer):
             'date_fin',
         ]
         extra_kwargs = {
-            'module': {'required': True},
+            'matiere': {'required': True},
+            'salle': {'required': True},
             'heure_debut': {'required': True},
             'heure_fin': {'required': True},
             'date_debut': {'required': True},
-            'date_fin': {'required': True},
         }
-        
+
+#######################Hado 3la 7sab profile d ens###############################
+
 class EmailSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True)
 
 class PasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField(required=True)
     new_password = serializers.CharField(required=True, min_length=8)
-    
-    
+  
+#################Hada mwe7ed bin admin w etudiant  
+  
 class HelpRequestSerializer(serializers.ModelSerializer):
-    enseignant_email = serializers.EmailField(source='enseignant.email', read_only=True)
-
     class Meta:
         model = HelpRequest
-        fields = [
-            'id',
-            'enseignant',
-            'enseignant_email',
-            'message',
-            'response',
-            'resolved',
-            'created_at',
-            'responded_at',
-        ]
-        read_only_fields = ['enseignant', 'response', 'resolved', 'created_at', 'responded_at']
+        fields = '__all__'
+        read_only_fields = ['enseignant', 'etudiant', 'created_at', 'responded_at', 'resolved']
 
+################Hada dl absence orah khdam f 3vues w7da dyali w 2 dyalk
 class PresenceSerializer(serializers.ModelSerializer):
     nom = serializers.CharField(source="etudiant.nom")
     prenom = serializers.CharField(source="etudiant.prenom")
@@ -139,7 +191,7 @@ class EnseignantSerializer(serializers.ModelSerializer):
     class Meta:
         model = Enseignant
         fields = '__all__'
-
+############Liste dles enseignants #####################################
 class EnseignantListSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source='user.email')
     role = serializers.CharField(source='user.role', read_only=True)
@@ -148,7 +200,7 @@ class EnseignantListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Enseignant
         fields = ['id', 'nom', 'prenom', 'statut', 'email', 'role', 'is_active']
-
+######################3la 7sab creation w modification #################
 class EnseignantCreateUpdateSerializer(serializers.Serializer):
     email = serializers.EmailField(source='user.email', required=True)
     nom = serializers.CharField()
@@ -220,7 +272,7 @@ class EnseignantCreateUpdateSerializer(serializers.Serializer):
         return instance
 
         
-        
+###########################Autres serializers######################################### 
 class FiliereSerializer(serializers.ModelSerializer):
     class Meta:
         model = Filiere
@@ -245,7 +297,7 @@ class MatiereSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Matiere
-        fields = ['id', 'nom', 'enseignant', 'enseignant_id', 'filiere_id', 'niveau_id']
+        fields = ['id', 'nom', 'enseignant', 'enseignant_id','filiere_id', 'niveau_id']
         
 
         

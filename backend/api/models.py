@@ -74,7 +74,21 @@ class Etudiant(models.Model):
     
 #==================================================Cote Enseignant=========================================
 class HelpRequest(models.Model):
-    enseignant = models.ForeignKey(User, on_delete=models.CASCADE, related_name="help_requests")
+    enseignant = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="help_requests_enseignant",
+        null=True,
+        blank=True
+    )
+    etudiant = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="help_requests_etudiant",
+        null=True,
+        blank=True
+    )
+    subject = models.CharField(max_length=255)
     message = models.TextField()
     response = models.TextField(blank=True)
     resolved = models.BooleanField(default=False)
@@ -82,7 +96,8 @@ class HelpRequest(models.Model):
     responded_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
-        return f"Aide de {self.enseignant.email} le {self.created_at.strftime('%Y-%m-%d %H:%M')}"
+        auteur = self.enseignant or self.etudiant
+        return f"Aide de {auteur.email} le {self.created_at.strftime('%Y-%m-%d %H:%M')}"
     
 
 #====================================Autres modeles=================================================
@@ -106,6 +121,11 @@ class Matiere(models.Model):
 
     def __str__(self):
         return self.nom
+class Salle(models.Model):
+        nom = models.CharField(max_length=100)
+
+        def __str__(self):
+            return self.nom
 
 
 class Session(models.Model):
@@ -126,29 +146,32 @@ class Session(models.Model):
 
     enseignant = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     type_seance = models.CharField(max_length=10, choices=TYPE_CHOICES)
-    module = models.CharField(max_length=100)  
-    jour = models.CharField(max_length=10, choices=JOUR_CHOICES)  
-    heure_debut = models.TimeField()  
-    heure_fin = models.TimeField()  
-    salle = models.CharField(max_length=50)
-    filiere = models.CharField(max_length=50)
-    niveau = models.CharField(max_length=50)
-    date_debut = models.DateField()  
-    date_fin = models.DateField(null=True, blank=True) 
+    matiere = models.ForeignKey(Matiere, on_delete=models.CASCADE)
+    salle = models.ForeignKey(Salle, on_delete=models.CASCADE)
+    jour = models.CharField(max_length=10, choices=JOUR_CHOICES)
+    heure_debut = models.TimeField()
+    heure_fin = models.TimeField()
+    date_debut = models.DateField()
+    date_fin = models.DateField(null=True, blank=True)
     qr_code = models.ImageField(upload_to='qr_codes/', blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.module} ({self.type_seance}) - {self.niveau} - {self.jour} {self.heure_debut}"
+        return f"{self.matiere.nom} ({self.type_seance}) - {self.matiere.niveau.nom} - {self.jour} {self.heure_debut}"
+
+
 
 class Presence(models.Model):
     etudiant = models.ForeignKey(Etudiant, on_delete=models.CASCADE)
     session = models.ForeignKey(Session, on_delete=models.CASCADE)
     date = models.DateField(auto_now_add=True)
     justifiee = models.BooleanField(default=False)
+    scanned_at = models.DateTimeField(auto_now_add=True)  # ✅ pour le scan
+    status = models.CharField(max_length=20, default='présent(e)')  # ✅ optionnel
 
     def __str__(self):
         return f"{self.etudiant} - {self.session}"
+
     
 #=================================================Cote Admin=========================================
 
@@ -172,8 +195,3 @@ class PendingEnseignant(models.Model):
     def __str__(self):
         return f"{self.prenom} {self.nom} (En attente)"
     
-class Salle(models.Model):
-        nom = models.CharField(max_length=100)
-
-        def __str__(self):
-            return self.nom
