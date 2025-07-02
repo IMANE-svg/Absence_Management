@@ -1,0 +1,35 @@
+.help-container {
+  padding: 20px;
+  max-width: 800px;
+  margin: auto;
+}
+
+.help-card {
+  background: #f9f9f9;
+  padding: 15px;
+  margin-bottom: 20px;
+  border-left: 5px solid #4caf50;
+  border-radius: 5px;
+}
+
+.response-form textarea {
+  width: 100%;
+  height: 80px;
+  margin-top: 10px;
+  padding: 10px;
+}
+
+.response-form button {
+  margin-top: 10px;
+  background: #4caf50;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.resolved {
+  color: green;
+  font-weight: bold;
+}

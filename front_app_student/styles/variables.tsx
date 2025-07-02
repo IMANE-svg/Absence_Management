@@ -1,0 +1,8 @@
+export default {
+  blue: '#845448',
+  white: '#fffcf1',
+  gray: '#f5f5f5',
+  black1: '#222',
+  black2: '#999',
+  navHeight: 60,
+};

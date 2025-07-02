@@ -1,0 +1,78 @@
+.help-container {
+  max-width: 700px;
+  margin: 30px auto;
+  padding: 20px;
+  background: #f5f8fa;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.help-container h2,
+.help-container h3 {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.help-form textarea {
+  width: 100%;
+  height: 100px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  resize: vertical;
+  font-size: 16px;
+}
+
+.help-form button {
+  margin-top: 10px;
+  padding: 10px 20px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.help-form button:hover {
+  background-color: #0056b3;
+}
+
+.success {
+  color: green;
+  margin-top: 10px;
+}
+
+.error {
+  color: red;
+  margin-top: 10px;
+}
+
+.help-list {
+  list-style: none;
+  padding: 0;
+  margin-top: 20px;
+}
+
+.help-item {
+  background-color: #fff;
+  border-left: 5px solid #007bff;
+  padding: 15px;
+  margin-bottom: 15px;
+  border-radius: 8px;
+}
+
+.help-msg {
+  margin-bottom: 8px;
+}
+
+.admin-response {
+  background-color: #eef8ff;
+  padding: 10px;
+  border-radius: 6px;
+  margin-top: 8px;
+}
+
+.pending {
+  color: #999;
+  font-style: italic;
+}

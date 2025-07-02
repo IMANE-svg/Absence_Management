@@ -1,0 +1,76 @@
+.liste-absences-container {
+  max-width: 1000px;
+  margin: auto;
+  padding: 20px;
+  background: #fdfdfd;
+}
+
+h2 {
+  text-align: center;
+  color: #444;
+}
+
+.filters {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.filters input,
+.filters button {
+  padding: 8px 12px;
+  font-size: 16px;
+}
+
+.absence-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 30px;
+}
+
+.absence-table th,
+.absence-table td {
+  border: 1px solid #ddd;
+  padding: 10px;
+  text-align: center;
+}
+
+.absence-table th {
+  background-color: #f3f3f3;
+  color: #333;
+}
+
+.present {
+  color: green;
+  font-weight: bold;
+}
+
+.absent {
+  color: red;
+  font-weight: bold;
+}
+
+.stats {
+  text-align: center;
+  background-color: #f4f6f8;
+  padding: 20px;
+  border-radius: 10px;
+}
+
+.error {
+  text-align: center;
+  color: red;
+  margin-top: 10px;
+}
+
+.present {
+  color: green;
+  font-weight: bold;
+}
+
+.absent {
+  color: red;
+  font-weight: bold;
+}

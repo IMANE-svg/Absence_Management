@@ -1,0 +1,32 @@
+.gestion-container {
+  padding: 20px;
+  max-width: 800px;
+  margin: auto;
+}
+
+.add-button {
+  margin-bottom: 10px;
+  background-color: #1e90ff;
+  color: white;
+  padding: 10px;
+  border: none;
+  border-radius: 4px;
+}
+
+.enseignant-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.enseignant-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.enseignant-table th,
+.enseignant-table td {
+  border: 1px solid #ddd;
+  padding: 8px;
+}
