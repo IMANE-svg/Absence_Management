@@ -20,6 +20,7 @@ from rest_framework.generics import get_object_or_404
 import pytz
 from django.http import HttpResponse
 import pandas as pd
+from django.utils.timezone import now as timezone_now
 from openpyxl import Workbook
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -326,10 +327,10 @@ class SessionViewSet(viewsets.ModelViewSet):
         return Session.objects.filter(enseignant=self.request.user)
 
     def perform_create(self, serializer):
-        data = self.request.data
-        date_debut = serializer.validated_data['date_debut']
-        date_fin = serializer.validated_data['date_fin']
-        jour_cible = serializer.validated_data['jour']
+        data = serializer.validated_data
+        date_debut = data['date_debut']
+        date_fin = data['date_fin']
+        jour_cible = data['jour']
 
         jours_map = {
             'Lundi': 0, 'Mardi': 1, 'Mercredi': 2,
@@ -340,51 +341,50 @@ class SessionViewSet(viewsets.ModelViewSet):
         current = date_debut
         while current <= date_fin:
             if current.weekday() == weekday_target:
-                serializer.save(
+                Session.objects.create(
                     enseignant=self.request.user,
+                    matiere=data['matiere'],
+                    salle=data['salle'],
+                    jour=jour_cible,
+                    heure_debut=data['heure_debut'],
+                    heure_fin=data['heure_fin'],
                     date_debut=current,
                     date_fin=current
                 )
             current += timedelta(days=1)
 
+
 ############Les vues d lenseignant##############################################
 ### Katregrouper nb detudiants f seances , nbr de seances dlprof o la seance prochaine #####################
+
+
 
 class DashboardView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         user = request.user
-        now = datetime.now(pytz.timezone('Africa/Casablanca'))
+        now = timezone_now().astimezone(pytz.timezone('Africa/Casablanca'))
         today_date = now.date()
         current_time = now.time()
-        current_day = now.strftime('%A')
 
-        jour_mapping = {
-            'Monday': 'Lundi',
-            'Tuesday': 'Mardi',
-            'Wednesday': 'Mercredi',
-            'Thursday': 'Jeudi',
-            'Friday': 'Vendredi',
-            'Saturday': 'Samedi',
-            'Sunday': 'Dimanche',
-        }
-        jour = jour_mapping.get(current_day, current_day)
-
-        # Récupérer les séances du jour
+        # Récupérer toutes les séances à venir (y compris aujourd'hui)
         sessions = Session.objects.filter(
             enseignant=user,
-            jour=jour,
-            date_debut__lte=today_date,
-            date_fin__gte=today_date
-        ).order_by('heure_debut')
+            date_debut__gte=today_date
+        ).order_by('date_debut', 'heure_debut')
 
         selected_session = None
         for session in sessions:
-            if session.heure_debut <= current_time <= session.heure_fin:
-                selected_session = session
-                break
-            elif current_time < session.heure_debut:
+            session_datetime = datetime.combine(session.date_debut, session.heure_debut).astimezone(pytz.timezone('Africa/Casablanca'))
+            if session.date_debut == today_date:
+                if session.heure_debut <= current_time <= session.heure_fin:
+                    selected_session = session
+                    break
+                elif current_time < session.heure_debut:
+                    selected_session = session
+                    break
+            elif session.date_debut > today_date:
                 selected_session = session
                 break
 
@@ -397,10 +397,11 @@ class DashboardView(APIView):
             filiere = selected_session.matiere.filiere
             niveau = selected_session.matiere.niveau
 
-            # Étudiants de la même filière et niveau
-            nb_etudiants = Etudiant.objects.filter(filiere=filiere, niveau=niveau).count()
+            nb_etudiants = Etudiant.objects.filter(
+                filiere=filiere,
+                niveau=niveau
+            ).count()
 
-            # Séances de l’enseignant pour cette filière/niveau
             nb_seances = Session.objects.filter(
                 enseignant=user,
                 matiere__filiere=filiere,
@@ -413,6 +414,7 @@ class DashboardView(APIView):
                 'heure_debut': selected_session.heure_debut.strftime('%H:%M'),
                 'heure_fin': selected_session.heure_fin.strftime('%H:%M'),
                 'jour': selected_session.jour,
+                'date': selected_session.date_debut.strftime('%Y-%m-%d'),
                 'salle': selected_session.salle.nom,
                 'filiere': filiere.nom,
                 'niveau': niveau.nom,
@@ -423,6 +425,7 @@ class DashboardView(APIView):
             'nb_seances': nb_seances,
             'seance_prochaine': session_data,
         })
+
 
 #############Hada ghi 3la 7sab l modification dl profile: email w password
 ###########ladmin li kaykn dayr password mowe7ed mais mn b3d lenseignant kaybdlo
