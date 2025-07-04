@@ -31,7 +31,16 @@ const Navbar = () => {
                             <span className="icon">
                                 <IonIcon icon={people} />
                             </span>
-                            <span className="title">Gestion d'utilisateur</span>
+                            <span className="title">Enseignants</span>
+                        </Link>
+                    </li>
+
+                    <li>
+                        <Link to="/admin/etudiant">
+                            <span className="icon">
+                                <IonIcon icon={people} />
+                            </span>
+                            <span className="title">Etudiants</span>
                         </Link>
                     </li>
 
@@ -40,7 +49,7 @@ const Navbar = () => {
                             <span className="icon">
                                 <IonIcon icon={book} />
                             </span>
-                            <span className="title">Gestion de Matière</span>
+                            <span className="title">Matière</span>
                         </Link>
                     </li>
 

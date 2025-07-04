@@ -6,19 +6,30 @@ import { useLocation } from 'react-router-dom';
 
 function Liste() {
   const location = useLocation();
-  const dashboardData = location.state?.dashboardData;
+  const [dashboardData, setDashboardData] = useState(location.state?.dashboardData || null);
   const [etudiants, setEtudiants] = useState([]);
   const [stats, setStats] = useState({});
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
-  const sessionId = dashboardData.seance_prochaine.id;
+  
 
-  const fetchAbsences = async () => {
+
+
+  const fetchDashboard = async () => {
     try {
-      const response = await api.get(`absences/?session_id=${sessionId}`); // plus de params nécessaires
+      const response = await api.get('/dashboard/');
+      setDashboardData(response.data);
+    } catch (err) {
+      console.error(err);
+      setError("Impossible de charger les données du dashboard.");
+    }
+  };
+
+  const fetchAbsences = async (sessionId) => {
+    try {
+      const response = await api.get(`/absences/?session_id=${sessionId}`);
       setEtudiants(response.data.etudiants);
       setStats(response.data.statistiques);
-      setError('');
     } catch (err) {
       console.error(err);
       setError("Erreur lors du chargement des absences.");
@@ -28,10 +39,20 @@ function Liste() {
   };
 
   useEffect(() => {
-    if (sessionId) {
-      fetchAbsences();
+    if (!dashboardData) {
+      fetchDashboard();
     }
-  }, [sessionId]);
+  }, []);
+
+  useEffect(() => {
+    const sessionId = dashboardData?.seance_prochaine?.id;
+    if (sessionId) {
+      fetchAbsences(sessionId);
+    } else if (dashboardData && !dashboardData.seance_prochaine) {
+      setError("Aucune séance à venir.");
+      setLoading(false);
+    }
+  }, [dashboardData]);
 
   return (
     <div className="liste-absences-container">

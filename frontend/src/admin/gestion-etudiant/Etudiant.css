@@ -1,0 +1,224 @@
+/* Etudiant.css */
+@import "../../styles/variables.css";
+
+.etudiant-container {
+  padding: 20px;
+  margin-top: var(--nav-height);
+  background-color: var(--light-bg);
+  min-height: calc(100vh - var(--nav-height));
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.header h1 {
+  color: var(--dark-blue);
+  font-size: 1.8rem;
+}
+
+.add-button {
+  background-color: var(--blue);
+  color: white;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.add-button:hover {
+  background-color: var(--dark-blue);
+}
+
+.search-bar {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 15px;
+}
+
+.search-input {
+  display: flex;
+  align-items: center;
+  background-color: white;
+  padding: 8px 15px;
+  border-radius: 5px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  width: 300px;
+}
+
+.search-input input {
+  border: none;
+  outline: none;
+  margin-left: 10px;
+  width: 100%;
+  font-size: 0.9rem;
+}
+
+.filter-toggle {
+  background-color: var(--light-gray);
+  border: none;
+  padding: 8px 15px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.filters {
+  background-color: white;
+  padding: 15px;
+  border-radius: 5px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  display: flex;
+  gap: 20px;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.filter-group label {
+  font-size: 0.8rem;
+  color: var(--dark-gray);
+}
+
+.filter-group select {
+  padding: 8px;
+  border-radius: 5px;
+  border: 1px solid var(--light-gray);
+  min-width: 200px;
+}
+
+.etudiant-table-container {
+  background-color: white;
+  border-radius: 5px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  overflow-x: auto;
+}
+
+.etudiant-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.etudiant-table th {
+  background-color: var(--blue);
+  color: white;
+  padding: 12px 15px;
+  text-align: left;
+}
+
+.etudiant-table td {
+  padding: 12px 15px;
+  border-bottom: 1px solid var(--light-gray);
+}
+
+.etudiant-table tr:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.etudiant-table img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.avatar-placeholder {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: var(--light-blue);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+}
+
+.edit-button, .delete-button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 5px;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.edit-button {
+  color: var(--blue);
+}
+
+.edit-button:hover {
+  background-color: rgba(0, 123, 255, 0.1);
+}
+
+.delete-button {
+  color: var(--red);
+}
+
+.delete-button:hover {
+  background-color: rgba(220, 53, 69, 0.1);
+}
+
+.no-data {
+  text-align: center;
+  padding: 20px;
+  color: var(--dark-gray);
+}
+
+.loading, .error {
+  text-align: center;
+  padding: 50px;
+  font-size: 1.2rem;
+}
+
+.error {
+  color: var(--red);
+}
+
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .search-bar {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .search-input {
+    width: 100%;
+  }
+
+  .filters {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .filter-group select {
+    width: 100%;
+  }
+}

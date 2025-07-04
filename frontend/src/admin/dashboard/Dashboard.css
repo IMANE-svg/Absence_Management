@@ -95,6 +95,62 @@
   background-color: #d97706;
 }
 
+/* Nouveaux styles pour les rapports */
+.report-container {
+  background: #ffffff;
+  padding: 1.5rem;
+  border-radius: 0.75rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 2rem;
+}
+
+.report-container h3 {
+  font-size: 1.2rem;
+  color: #1f2937;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.report-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: center;
+  align-items: center;
+}
+
+.report-select {
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  min-width: 200px;
+}
+
+.report-button {
+  background-color: #845448;
+  color: white;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.report-button:hover {
+  background-color: #844839;
+}
+
+@media (max-width: 768px) {
+  .report-controls {
+    flex-direction: column;
+  }
+  
+  .report-select, .report-button {
+    width: 100%;
+  }
+}
+
 @media (max-width: 600px) {
   .dashboard-title {
     font-size: 1.5rem;
