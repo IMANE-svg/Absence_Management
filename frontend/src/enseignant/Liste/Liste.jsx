@@ -27,7 +27,9 @@ function Liste() {
 
   const fetchAbsences = async (sessionId) => {
     try {
+
       const response = await api.get(`absences/?session_id=${sessionId}`);
+
       setEtudiants(response.data.etudiants);
       setStats(response.data.statistiques);
     } catch (err) {

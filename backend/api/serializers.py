@@ -271,7 +271,36 @@ class EnseignantCreateUpdateSerializer(serializers.Serializer):
 
         return instance
 
+# ################################## Gestion des etud /admin
+class EtudiantSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField(source='user.email')
+    is_active = serializers.BooleanField(source='user.is_active', read_only=True)
+
+    class Meta:
+        model = Etudiant
+        fields = ['id', 'nom', 'prenom', 'email', 'filiere', 'niveau', 'photo', 'is_active']
+        read_only_fields = ['id']
+
+    def update(self, instance, validated_data):
+        user_data = validated_data.pop('user', {})
+        user = instance.user
         
+        # Mise à jour de l'email si fourni
+        if 'email' in user_data:
+            user.email = user_data['email']
+            user.save()
+        
+        # Mise à jour des autres champs de l'étudiant
+        instance.nom = validated_data.get('nom', instance.nom)
+        instance.prenom = validated_data.get('prenom', instance.prenom)
+        instance.filiere = validated_data.get('filiere', instance.filiere)
+        instance.niveau = validated_data.get('niveau', instance.niveau)
+        
+        if 'photo' in validated_data:
+            instance.photo = validated_data['photo']
+        
+        instance.save()
+        return instance    
 ###########################Autres serializers######################################### 
 class FiliereSerializer(serializers.ModelSerializer):
     class Meta:

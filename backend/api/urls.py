@@ -3,10 +3,10 @@ from django.conf import settings
 from django.conf.urls.static import static
 from .views import (
     EnseignantSignupView,CustomTokenObtainPairView, GenerateQRCodeAPI,
-    ProfileAPI, PasswordAPI, AdminHelpResponseView,
+    ProfileAPI, PasswordAPI, AdminHelpResponseView,EtudiantViewSet,
     get_absences, AdminEnseignantViewSet, QRNotificationView, FiliereViewSet, MatiereViewSet, 
     NiveauViewSet,DashboardView, PendingEnseignantViewSet, AdminHelpListView, AdminDashboardStatsView,SalleViewSet,
-    SessionViewSet, HelpRequestAPI, ExportAbsencesExcel, ExportEnseignantsExcel,ExportEtudiantsExcel,ExportMatieresExcel,
+    SessionViewSet, HelpRequestAPI,ExportAbsencesReport,EnseignantReport,
     RegisterEtudiantView, logout_view, enregistrer_presence_scan, get_student_presences,student_profile_view,generer_rapport_presence,
     telecharger_rapport_excel
 )
@@ -27,6 +27,9 @@ router.register(r'matieres', MatiereViewSet)
 router.register(r'pending-enseignants', PendingEnseignantViewSet, basename='pending-enseignants')
 router.register(r'seances', SessionViewSet, basename='seance')
 router.register(r'salles', SalleViewSet)
+
+# Gestion des etudieant
+router.register(r'admin/etudiants', EtudiantViewSet, basename='admin-etudiants')
 
 
 urlpatterns = [
@@ -59,10 +62,10 @@ urlpatterns = [
     path('pending-enseignants/<int:pk>/validate/', PendingEnseignantViewSet.as_view({'post': 'validate'})),
     path('pending-enseignants/<int:pk>/delete/', PendingEnseignantViewSet.as_view({'delete': 'destroy'})),
 
-    path('admin/export/enseignants/', ExportEnseignantsExcel.as_view() ,name ='export-enseignants'),
-    path("admin/export/matieres/", ExportMatieresExcel.as_view(), name='export-matieres'),
-    path('admin/export/etudiants', ExportEtudiantsExcel.as_view(), name = 'export-etudiants'),
-    path("admin/export/absences", ExportAbsencesExcel.as_view(), name ='export-absences'),
+
+    # génération rapport
+    path('admin/qr-report/', EnseignantReport.as_view(), name='qr-report'),
+    path('admin/export-absences/', ExportAbsencesReport.as_view(), name='export-absences'),
     
     # Etudiant 
     path('signup/etudiant/', RegisterEtudiantView.as_view(), name='etudiant_signup'),
