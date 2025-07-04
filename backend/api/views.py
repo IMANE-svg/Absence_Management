@@ -3,7 +3,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.contrib.auth import  update_session_auth_hash
 from .models import Enseignant,PendingEnseignant,Etudiant, HelpRequest,Salle, Presence, QRNotification, Session, Filiere, Niveau, Matiere
-from .serializers import EnseignantSignupSerializer, CustomTokenObtainPairSerializer,EtudiantRegisterSerializer, PendingEnseignantSerializer, SessionSerializer,PasswordSerializer, EmailSerializer, HelpRequestSerializer, PresenceSerializer, FiliereSerializer , MatiereSerializer, NiveauSerializer, EnseignantSerializer, EnseignantCreateUpdateSerializer, EnseignantListSerializer,SalleSerializer
+from .serializers import EnseignantSignupSerializer, CustomTokenObtainPairSerializer, EtudiantRegisterSerializer, PendingEnseignantSerializer, SessionSerializer, PasswordSerializer, EmailSerializer, HelpRequestSerializer, PresenceSerializer, FiliereSerializer, MatiereSerializer, NiveauSerializer, EnseignantSerializer, EnseignantCreateUpdateSerializer, EnseignantListSerializer, SalleSerializer
+from .serializers import EtudiantSerializer
 import qrcode
 import re
 from django.core.files import File
@@ -25,6 +26,9 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
 from dateutil.relativedelta import relativedelta
 from django.db.models import Q
+from django.utils import timezone
+from rest_framework import filters
+
 ###############################L'authentification################################################
 
 #########Rani mst3mla simplejwt fiha access token w refresh token###################################
@@ -317,7 +321,6 @@ def get_student_presences(request):
 
 #############Had l modele li nayd 3lih lfilm lenseignant y9dr y3mr les seances dyalo mra we7da pdt wa7ed lperiode
 ############System mn b3d kayb9a ydetecter automatiquement seance: niv fil matiere..............
-
 class SessionViewSet(viewsets.ModelViewSet):
     serializer_class = SessionSerializer
     permission_classes = [IsAuthenticated]
@@ -326,10 +329,10 @@ class SessionViewSet(viewsets.ModelViewSet):
         return Session.objects.filter(enseignant=self.request.user)
 
     def perform_create(self, serializer):
-        data = self.request.data
-        date_debut = serializer.validated_data['date_debut']
-        date_fin = serializer.validated_data['date_fin']
-        jour_cible = serializer.validated_data['jour']
+        data = serializer.validated_data
+        date_debut = data['date_debut']
+        date_fin = data['date_fin']
+        jour_cible = data['jour']
 
         jours_map = {
             'Lundi': 0, 'Mardi': 1, 'Mercredi': 2,
@@ -340,13 +343,17 @@ class SessionViewSet(viewsets.ModelViewSet):
         current = date_debut
         while current <= date_fin:
             if current.weekday() == weekday_target:
-                serializer.save(
+                Session.objects.create(
                     enseignant=self.request.user,
+                    matiere=data['matiere'],
+                    salle=data['salle'],
+                    jour=jour_cible,
+                    heure_debut=data['heure_debut'],
+                    heure_fin=data['heure_fin'],
                     date_debut=current,
                     date_fin=current
                 )
             current += timedelta(days=1)
-
 ############Les vues d lenseignant##############################################
 ### Katregrouper nb detudiants f seances , nbr de seances dlprof o la seance prochaine #####################
 
@@ -355,36 +362,27 @@ class DashboardView(APIView):
 
     def get(self, request):
         user = request.user
-        now = datetime.now(pytz.timezone('Africa/Casablanca'))
+        now = timezone.now().astimezone(pytz.timezone('Africa/Casablanca'))
         today_date = now.date()
         current_time = now.time()
-        current_day = now.strftime('%A')
 
-        jour_mapping = {
-            'Monday': 'Lundi',
-            'Tuesday': 'Mardi',
-            'Wednesday': 'Mercredi',
-            'Thursday': 'Jeudi',
-            'Friday': 'Vendredi',
-            'Saturday': 'Samedi',
-            'Sunday': 'Dimanche',
-        }
-        jour = jour_mapping.get(current_day, current_day)
-
-        # Récupérer les séances du jour
+        # Récupérer toutes les séances à venir (y compris aujourd'hui)
         sessions = Session.objects.filter(
             enseignant=user,
-            jour=jour,
-            date_debut__lte=today_date,
-            date_fin__gte=today_date
-        ).order_by('heure_debut')
+            date_debut__gte=today_date
+        ).order_by('date_debut', 'heure_debut')
 
         selected_session = None
         for session in sessions:
-            if session.heure_debut <= current_time <= session.heure_fin:
-                selected_session = session
-                break
-            elif current_time < session.heure_debut:
+            session_datetime = datetime.combine(session.date_debut, session.heure_debut).astimezone(pytz.timezone('Africa/Casablanca'))
+            if session.date_debut == today_date:
+                if session.heure_debut <= current_time <= session.heure_fin:
+                    selected_session = session
+                    break
+                elif current_time < session.heure_debut:
+                    selected_session = session
+                    break
+            elif session.date_debut > today_date:
                 selected_session = session
                 break
 
@@ -397,10 +395,11 @@ class DashboardView(APIView):
             filiere = selected_session.matiere.filiere
             niveau = selected_session.matiere.niveau
 
-            # Étudiants de la même filière et niveau
-            nb_etudiants = Etudiant.objects.filter(filiere=filiere, niveau=niveau).count()
+            nb_etudiants = Etudiant.objects.filter(
+                filiere=filiere,
+                niveau=niveau
+            ).count()
 
-            # Séances de l’enseignant pour cette filière/niveau
             nb_seances = Session.objects.filter(
                 enseignant=user,
                 matiere__filiere=filiere,
@@ -413,6 +412,7 @@ class DashboardView(APIView):
                 'heure_debut': selected_session.heure_debut.strftime('%H:%M'),
                 'heure_fin': selected_session.heure_fin.strftime('%H:%M'),
                 'jour': selected_session.jour,
+                'date': selected_session.date_debut.strftime('%Y-%m-%d'),
                 'salle': selected_session.salle.nom,
                 'filiere': filiere.nom,
                 'niveau': niveau.nom,
@@ -810,159 +810,244 @@ class AdminDashboardStatsView(APIView):
         }
         return Response(data)
     
-###############l'export dles enseignants mais fih les erreurs mn b3d onfixihum 3sbni    
+###############Gestion des etudients
+class EtudiantViewSet(viewsets.ModelViewSet):
+    queryset = Etudiant.objects.all()
+    serializer_class = EtudiantSerializer
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['nom', 'prenom', 'user__email']
 
-class ExportEnseignantsExcel(APIView):
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        filiere = self.request.query_params.get('filiere')
+        niveau = self.request.query_params.get('niveau')
+        
+        if filiere:
+            queryset = queryset.filter(filiere=filiere)
+        if niveau:
+            queryset = queryset.filter(niveau=niveau)
+            
+        return queryset    
+    
+###############rapport admin/etud
+from openpyxl import Workbook
+from openpyxl.utils.dataframe import dataframe_to_rows
+from io import BytesIO
+import pandas as pd
+from django.http import HttpResponse
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from .models import Etudiant, Presence, Filiere, Niveau, Session
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
+from django.utils import timezone
+
+class ExportAbsencesReport(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
 
     def get(self, request):
-        # 📅 Récupération des paramètres de période
-        mois = request.query_params.get('mois')  # ex: "2025-07"
-        semestre = request.query_params.get('semestre')  # ex: "1" ou "2"
-        now = timezone.now()
+        # 1. Récupérer les paramètres
+        filiere_id = request.query_params.get('filiere')
+        niveau_id = request.query_params.get('niveau')
+        mois = request.query_params.get('mois')  # Optionnel (ex: "2024-07")
 
-        # Définir la période de filtrage
-        date_debut = None
-        date_fin = None
+        # Validation des paramètres obligatoires
+        if not filiere_id or not niveau_id:
+            return Response(
+                {"error": "Les paramètres 'filiere' et 'niveau' sont requis."},
+                status=400
+            )
 
+        try:
+            filiere = Filiere.objects.get(id=filiere_id)
+            niveau = Niveau.objects.get(id=niveau_id)
+        except (Filiere.DoesNotExist, Niveau.DoesNotExist):
+            return Response(
+                {"error": "Filière ou niveau introuvable."},
+                status=404
+            )
+
+        # 2. Filtrer les absences
+        absences = Presence.objects.filter(
+            etudiant__filiere=filiere.nom,
+            etudiant__niveau=niveau.nom,
+            status='absent(e)'  # ou `justifiee=False` pour les non-justifiées
+        ).select_related('etudiant', 'session', 'session__matiere', 'session__salle')
+
+        # Filtrer par mois si spécifié
         if mois:
             try:
                 annee, mois_num = map(int, mois.split('-'))
                 date_debut = datetime(annee, mois_num, 1)
                 date_fin = date_debut + relativedelta(months=1)
-            except:
-                return Response({"error": "Format de mois invalide. Utilisez AAAA-MM."}, status=400)
+                absences = absences.filter(date__gte=date_debut, date__lt=date_fin)
+            except ValueError:
+                return Response(
+                    {"error": "Format de mois invalide. Utilisez YYYY-MM."},
+                    status=400
+                )
 
-        elif semestre:
-            annee = now.year
-            if semestre == "1":
-                date_debut = datetime(annee, 1, 1)
-                date_fin = datetime(annee, 6, 30)
-            elif semestre == "2":
-                date_debut = datetime(annee, 7, 1)
-                date_fin = datetime(annee, 12, 31)
+        # 3. Préparer les données
+        # Liste des étudiants
+        etudiants = Etudiant.objects.filter(
+            filiere=filiere.nom,
+            niveau=niveau.nom
+        ).values('nom', 'prenom', 'user__email')  # Ajoutez 'apogee' si disponible
 
-        enseignants = Enseignant.objects.select_related('user').all()
-        data = []
-
-        for enseignant in enseignants:
-            sessions = Session.objects.filter(enseignant=enseignant.user).select_related('matiere')
-
-            # Appliquer le filtre de période si défini
-            if date_debut and date_fin:
-                sessions = sessions.filter(date_debut__lte=date_fin, date_fin__gte=date_debut)
-
-            matieres = set(s.matiere.nom for s in sessions)
-            filieres = set(s.matiere.filiere.nom for s in sessions)
-            niveaux = set(s.matiere.niveau.nom for s in sessions)
-
-            total_presences = 0
-            total_attendus = 0
-
-            for session in sessions:
-                filiere = session.matiere.filiere
-                niveau = session.matiere.niveau
-                nb_etudiants = Etudiant.objects.filter(filiere=filiere, niveau=niveau).count()
-                nb_presents = Presence.objects.filter(session=session).count()
-
-                total_attendus += nb_etudiants
-                total_presences += nb_presents
-
-            taux_presence = round((total_presences / total_attendus) * 100, 2) if total_attendus > 0 else 0
-
-            data.append({
-                'Nom': enseignant.nom,
-                'Prénom': enseignant.prenom,
-                'Email': enseignant.user.email,
-                'Actif': 'Oui' if enseignant.user.is_active else 'Non',
-                'Statut': enseignant.statut,
-                'Modules enseignés': ', '.join(matieres) if matieres else '—',
-                'Filières': ', '.join(filieres) if filieres else '—',
-                'Niveaux': ', '.join(niveaux) if niveaux else '—',
-                'Nombre de séances': sessions.count(),
-                'Taux moyen de présence (%)': taux_presence,
+        # Détail des absences
+        absences_data = []
+        for absence in absences:
+            absences_data.append({
+                'Nom': absence.etudiant.nom,
+                'Prénom': absence.etudiant.prenom,
+                'Module': absence.session.matiere.nom,
+                'Type': absence.session.type_seance,
+                'Date': absence.date.strftime('%d/%m/%Y'),
+                'Heure': f"{absence.session.heure_debut.strftime('%H:%M')} - {absence.session.heure_fin.strftime('%H:%M')}",
+                'Salle': absence.session.salle.nom,
+                'Justifiée': 'Oui' if absence.justifiee else 'Non'
             })
 
-        df = pd.DataFrame(data)
-        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        response['Content-Disposition'] = 'attachment; filename=rapport_enseignants.xlsx'
-        df.to_excel(response, index=False)
-        return response
-    
-###############Hadi ghu zwa9 ta t9adiha partie dyalk -_-
+        # 4. Générer le fichier Excel
+        wb = Workbook()
+        wb.remove(wb.active)  # Supprimer la feuille par défaut
 
-class ExportEtudiantsExcel(APIView):
-    
-    permission_classes = [IsAuthenticated, IsAdminUser]
+        # Feuille 1: Liste des étudiants
+        ws_etudiants = wb.create_sheet("Étudiants")
+        ws_etudiants.append(["Nom", "Prénom", "Email"])  # Ajoutez "Apogée" si nécessaire
+        for etudiant in etudiants:
+            ws_etudiants.append([etudiant['nom'], etudiant['prenom'], etudiant['user__email']])
 
-    def get(self, request):
-        etudiants = Etudiant.objects.all().values(
-            'id', 'nom', 'prenom', 'user__email', 'filiere', 'niveau'
+        # Feuille 2: Absences
+        if absences_data:
+            ws_absences = wb.create_sheet("Absences")
+            ws_absences.append(list(absences_data[0].keys()))
+            for absence in absences_data:
+                ws_absences.append(list(absence.values()))
+        else:
+            ws_absences = wb.create_sheet("Absences")
+            ws_absences.append(["Aucune absence trouvée pour les critères sélectionnés."])
+
+        # Feuille 3: Statistiques (si des absences existent)
+        if absences_data:
+            df_absences = pd.DataFrame(absences_data)
+            stats = df_absences.groupby('Module').size().reset_index(name='Total Absences')
+            stats['Taux Absence (%)'] = (stats['Total Absences'] / len(etudiants) * 100)
+
+            ws_stats = wb.create_sheet("Statistiques")
+            ws_stats.append(["Module", "Total Absences", "Taux Absence (%)"])
+            for _, row in stats.iterrows():
+                ws_stats.append([row['Module'], row['Total Absences'], round(row['Taux Absence (%)'], 2)])
+
+        # 5. Retourner le fichier
+        buffer = BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+
+        filename = f"absences_{filiere.nom}_{niveau.nom}_{timezone.now().strftime('%Y%m%d')}.xlsx"
+        response = HttpResponse(
+            buffer.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
-        df = pd.DataFrame(etudiants)
-        df.rename(columns={'filiere__nom': 'filiere'}, inplace=True)
-        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        response['Content-Disposition'] = 'attachment; filename=etudiants_report.xlsx'
-        df.to_excel(response, index=False)
+        response['Content-Disposition'] = f'attachment; filename={filename}'
         return response
-    
-#########    Hada ma3rftch sara7a dayra fih ghi matiere w lenseignant ma3rftch chnu nzid
+#############################################rapport coté admin/ens#######################################
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from django.utils import timezone
+from django.http import HttpResponse
+import pandas as pd
+from datetime import datetime, timedelta
+from .models import Session, Enseignant, QRNotification
+from django.db.models import Count, Q
+from django.utils.timezone import now
+from django.http import HttpResponse
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment
+from datetime import timedelta
+import calendar
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from rest_framework.response import Response
+from .models import QRNotification
 
-class ExportMatieresExcel(APIView):
-    
+class EnseignantReport(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
 
     def get(self, request):
-        matieres = Matiere.objects.all().values('id', 'nom', 'enseignant__nom')
-        df = pd.DataFrame(matieres)
-        df.rename(columns={'enseignant__nom': 'enseignant'}, inplace=True)
-        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        response['Content-Disposition'] = 'attachment; filename=matieres_report.xlsx'
-        df.to_excel(response, index=False)
-        return response
-    
-########Hada ghi gl3ih 7it ymkn labsence ghatzidiha f export etudiant 
+        periode = request.query_params.get('periode', 'mois')  # 'mois' ou 'semestre'
+        today = now().date()
 
-class ExportAbsencesExcel(APIView):
-    
-    permission_classes = [IsAuthenticated, IsAdminUser]
+        if periode == 'mois':
+            start_date = today.replace(day=1)
+            end_date = today
+        elif periode == 'semestre':
+            if today.month <= 6:
+                start_date = today.replace(month=1, day=1)
+            else:
+                start_date = today.replace(month=7, day=1)
+            end_date = today
+        else:
+            return Response({"error": "Période invalide"}, status=400)
 
-    def get(self, request):
-        absences = Presence.objects.select_related('etudiant', 'session').values(
-            'etudiant__nom',
-            'etudiant__prenom',
-            'session__module',
-            'session__type_seance',
-            'session__filiere',
-            'session__niveau',
-            'session__salle',
-            'date',  # date réelle de l’absence (depuis Presence)
-            'session__heure_debut',
-            'session__heure_fin',
-            'justifiee'
+        qrs = QRNotification.objects.filter(
+            created_at__date__gte=start_date,
+            created_at__date__lte=end_date
+        ).select_related('enseignant', 'session', 'session__matiere', 'session__salle', 
+                        'session__matiere__filiere', 'session__matiere__niveau')
+
+        # Organiser par enseignant
+        enseignants_dict = {}
+        for qr in qrs:
+            key = qr.enseignant
+            enseignants_dict.setdefault(key, []).append(qr)
+
+        # Création fichier Excel
+        wb = Workbook()
+        wb.remove(wb.active)  # Retirer la feuille par défaut
+
+        for enseignant, qr_list in enseignants_dict.items():
+            ws = wb.create_sheet(title=f"{enseignant.nom}_{enseignant.prenom}"[:30])
+
+            titre = f"Rapport des QR Codes générés – Pr. {enseignant.nom} {enseignant.prenom} – Période : {start_date.strftime('%d/%m/%Y')} au {end_date.strftime('%d/%m/%Y')}"
+            ws.merge_cells('A1:H1')
+            cell = ws['A1']
+            cell.value = titre
+            cell.font = Font(size=14, bold=True)
+            cell.alignment = Alignment(horizontal='center')
+
+            # En-têtes
+            headers = ['Date QR', 'Heure début', 'Heure fin', 'Matière', 'Type séance', 'Filière', 'Niveau', 'Salle']
+            ws.append(headers)
+            for cell in ws[2]:
+                cell.font = Font(bold=True)
+
+            # Données
+            for qr in qr_list:
+                session = qr.session
+                matiere = session.matiere
+                ws.append([
+                    qr.created_at.date().strftime('%d/%m/%Y'),
+                    session.heure_debut.strftime('%H:%M'),
+                    session.heure_fin.strftime('%H:%M'),
+                    matiere.nom,
+                    session.type_seance,
+                    matiere.filiere.nom,
+                    matiere.niveau.nom,
+                    session.salle.nom
+                ])
+
+        # Préparer la réponse HTTP
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
+        filename = f"rapport_qr_professeurs_{periode}_{now().strftime('%Y%m%d')}.xlsx"
+        response['Content-Disposition'] = f'attachment; filename={filename}'
 
-        df = pd.DataFrame(absences)
-        df.rename(columns={
-            'etudiant__nom': 'Nom étudiant',
-            'etudiant__prenom': 'Prénom étudiant',
-            'session__module': 'Module',
-            'session__type_seance': 'Type',
-            'session__filiere': 'Filière',
-            'session__niveau': 'Niveau',
-            'session__salle': 'Salle',
-            'date': 'Date',
-            'session__heure_debut': 'Heure début',
-            'session__heure_fin': 'Heure fin',
-            'justifiee': 'Justifiée'
-        }, inplace=True)
-
-        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        response['Content-Disposition'] = 'attachment; filename=absences_report.xlsx'
-        df.to_excel(response, index=False)
+        wb.save(response)
         return response
-
-
 #==============================================Autre views============================================================
     
 class FiliereViewSet(viewsets.ModelViewSet):
