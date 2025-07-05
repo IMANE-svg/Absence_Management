@@ -18,6 +18,7 @@ import Aide from "./enseignant/Help/Aide";
 import Liste from "./enseignant/Liste/Liste";
 import Parametre from "./enseignant/Parametres/Parametre";
 import MesSeances from "./enseignant/Seance/MesSeances";
+import EditEtudiant from "./admin/gestion-etudiant/EditEtudiant";
 
 function App() {
   return (
@@ -29,7 +30,8 @@ function App() {
             <Route path="/" element={<Login/>} ></Route>
             <Route path="/admin/dashboard" element={<Dashboard/>}></Route>
             <Route path="/admin/enseignant" element = {<Enseignant/>}></Route>
-            <Route path = "/admin/etudiant" element = {<Etudiant/>}></Route>
+            <Route path = "/admin/etudiants" element = {<Etudiant/>}></Route>
+            <Route path="/admin/etudiants/edit/:id" element={<EditEtudiant />} />
             <Route path="/admin/matiere" element={<Matiere/>}/>
             <Route path="/admin/help" element={<Help/>}></Route>
             <Route path="/signout" element={<Signout/>}></Route>
