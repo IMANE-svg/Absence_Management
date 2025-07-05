@@ -55,7 +55,7 @@ const Navbar = () => {
                     </li>
 
                     <li>
-                        <Link to="/admin/etudiant">
+                        <Link to="/admin/etudiants">
                             <span className="icon">
                                 <IonIcon icon={people} />
                             </span>

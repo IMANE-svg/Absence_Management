@@ -197,6 +197,42 @@
   color: var(--red);
 }
 
+/* Ajoutez ces styles à la fin du fichier */
+
+.search-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  gap: 15px;
+}
+
+.search-input {
+  flex-grow: 1;
+  display: flex;
+  align-items: center;
+  background-color: white;
+  padding: 8px 15px;
+  border-radius: 5px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.3s;
+}
+
+.search-input:focus-within {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.search-input input {
+  border: none;
+  outline: none;
+  margin-left: 10px;
+  width: 100%;
+  font-size: 0.9rem;
+  padding: 5px 0;
+}
+
+
+
 @media (max-width: 768px) {
   .header {
     flex-direction: column;
