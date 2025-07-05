@@ -281,12 +281,18 @@ class EtudiantSerializer(serializers.ModelSerializer):
         fields = ['id', 'nom', 'prenom', 'email', 'filiere', 'niveau', 'photo', 'is_active']
         read_only_fields = ['id']
 
+    def validate_email(self, value):
+        if not re.match(r'^[a-zA-Z0-9_.+-]+@ump\.ac\.ma$', value):
+            raise serializers.ValidationError("L'email doit être un email académique UMP (ex: nom.prenom@ump.ac.ma)")
+        return value
+
     def update(self, instance, validated_data):
         user_data = validated_data.pop('user', {})
         user = instance.user
         
         # Mise à jour de l'email si fourni
         if 'email' in user_data:
+            self.validate_email(user_data['email'])  # Validation de l'email
             user.email = user_data['email']
             user.save()
         
@@ -296,11 +302,17 @@ class EtudiantSerializer(serializers.ModelSerializer):
         instance.filiere = validated_data.get('filiere', instance.filiere)
         instance.niveau = validated_data.get('niveau', instance.niveau)
         
+        # Gestion de la photo
         if 'photo' in validated_data:
-            instance.photo = validated_data['photo']
+            if validated_data['photo'] is None:
+                # Supprimer la photo existante
+                instance.photo.delete(save=False)
+                instance.photo = None
+            else:
+                instance.photo = validated_data['photo']
         
         instance.save()
-        return instance    
+        return instance   
 ###########################Autres serializers######################################### 
 class FiliereSerializer(serializers.ModelSerializer):
     class Meta:
