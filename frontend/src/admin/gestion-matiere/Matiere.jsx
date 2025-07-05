@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../axiosConfig';
 import './Matiere.css';
+import Navbar from '../navbar/Navbar';
 
 const Matiere = () => {
   const [filieres, setFilieres] = useState([]);
@@ -69,6 +70,7 @@ const Matiere = () => {
 
   return (
     <div className="gestion-matiere-container">
+      <Navbar/>
       <h2>Gestion des Matières</h2>
 
       <div className="filters">

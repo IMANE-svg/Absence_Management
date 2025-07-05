@@ -134,11 +134,7 @@ const [filieres, setFilieres] = useState([]);
         </div>
       </div>
 
-      <div className="pending-btn-section">
-        <button className="pending-btn" onClick={() => navigate('/admin/pending-enseignants')}>
-          Voir les enseignants en attente
-        </button>
-      </div>
+      
 
       <div className="export-section">
   {/* Premier conteneur pour le rapport des étudiants */}

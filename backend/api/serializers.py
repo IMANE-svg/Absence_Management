@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User,Etudiant,PendingEnseignant, Enseignant, Session, HelpRequest, Presence, Filiere, Matiere, Niveau, Salle
+from .models import User,Etudiant, Enseignant, Session, HelpRequest, Presence, Filiere, Matiere, Niveau, Salle
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 import re
@@ -34,7 +34,7 @@ class EnseignantSignupSerializer(serializers.Serializer):
             email=validated_data['email'],
             password=password,
             role='enseignant',  
-            is_active=False     # l’admin doit activer le compte
+            is_active=True
         )
 
         # Créer profil enseignant
@@ -330,10 +330,6 @@ class MatiereSerializer(serializers.ModelSerializer):
         
 
         
-class PendingEnseignantSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = PendingEnseignant
-        fields = '__all__'
 
 class SalleSerializer(serializers.ModelSerializer):
     class Meta:

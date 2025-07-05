@@ -182,16 +182,5 @@ class QRNotification(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     
 
-class PendingEnseignant(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
-    nom = models.CharField(max_length=100)
-    prenom = models.CharField(max_length=100)
-    statut = models.CharField(max_length=20, choices=[
-        ('Professeur', 'Professeur'),
-        ('Vacataire', 'Vacataire')
-    ])
-    date_demande = models.DateTimeField(auto_now_add=True)
 
-    def __str__(self):
-        return f"{self.prenom} {self.nom} (En attente)"
     

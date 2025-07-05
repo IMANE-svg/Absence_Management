@@ -136,25 +136,23 @@ export default function ScanQRScreen() {
       });
       
       // ✅ Vérifie si la réponse est bien du JSON
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      throw new Error('Réponse inattendue du serveur');
-    }
-    const result = await response.json();
-      
+  const contentType = response.headers.get('content-type');
+   if (!contentType || !contentType.includes('application/json')) {
+     throw new Error('Réponse inattendue du serveur');
+     } 
+     const result = await response.json(); 
+     if (response.ok) { 
+      Alert.alert('Succès', result.message || 'Présence enregistrée !'); }
+       else {
+         Alert.alert('Erreur', result.error || "Échec de l'enregistrement"); } 
+        } catch (error) {
+           console.error(error); Alert.alert('Erreur', 'Problème de connexion'); }
+            finally { setIsScanning(false); } 
+          };
 
-      if (response.ok) {
-        Alert.alert('Succès', result.message || 'Présence enregistrée !');
-      } else {
-        Alert.alert('Erreur', result.error || "Échec de l'enregistrement");
-      }
-    } catch (error) {
-      console.error(error);
-      Alert.alert('Erreur', 'Problème de connexion');
-    } finally {
-      setIsScanning(false);
-    }
-  };
+
+
+  
 
   return (
     <View style={styles.mainContainer}>

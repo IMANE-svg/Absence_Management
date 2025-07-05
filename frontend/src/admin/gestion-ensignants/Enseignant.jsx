@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import './Enseignant.css';
 import api from '../../axiosConfig';
+import Navbar from '../navbar/Navbar';
 
 
 
@@ -97,6 +98,7 @@ const Enseignant = () => {
 
   return (
     <div className="gestion-container">
+      <Navbar/>
       <h2>Liste des enseignants</h2>
       <button
         className="add-button"
@@ -181,8 +183,8 @@ const Enseignant = () => {
               <td>{ens.email}</td>
               <td>{ens.statut}</td>
               <td>
-                <button onClick={() => handleEdit(ens)}>✏️</button>
-                <button onClick={() => handleDelete(ens.id)}>🗑️</button>
+                <button onClick={() => handleEdit(ens)}>Modifier</button>
+                <button onClick={() => handleDelete(ens.id)}>Supprimer</button>
               </td>
             </tr>
           ))}

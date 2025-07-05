@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import './Help.css';
 import api from '../../axiosConfig';
+import Navbar from '../navbar/Navbar';
 
 function Help() {
   const [helpRequests, setHelpRequests] = useState([]);
@@ -38,6 +39,7 @@ function Help() {
 
   return (
     <div className="help-container">
+      <Navbar/>
       <h2>Demandes d'aide des enseignants</h2>
       {helpRequests.map(req => (
         <div className="help-card" key={req.id}>

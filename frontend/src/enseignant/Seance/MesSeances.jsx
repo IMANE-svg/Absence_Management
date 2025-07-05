@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../axiosConfig';
 import './MesSeances.css';
+import Navbar from '../navbar/Navbar'
 
 const MesSeances = () => {
   const [seances, setSeances] = useState([]);
@@ -8,6 +9,8 @@ const MesSeances = () => {
   const [filieres, setFilieres] = useState([]);
 const [niveaux, setNiveaux] = useState([]);
 const [salles, setSalles] = useState([]);
+const [editingId, setEditingId] = useState(null);
+
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     type_seance: 'Cours',
@@ -62,29 +65,84 @@ const fetchNiveaux = async () => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      await api.post('seances/', formData);
-      alert('Séance ajoutée avec succès !');
-      setFormData({
-        type_seance: 'Cours',
-        module: '',
-        salle: '',
-        filiere: '',
-        niveau: '',
-        jour: 'Lundi',
-        heure_debut: '',
-        heure_fin: '',
-        date_debut: '',
-        date_fin: '',
-      });
-      setShowForm(false);
-      fetchSeances(); // 🔄 recharge les séances
-    } catch (error) {
-      console.error('Erreur :', error.response?.data || error.message);
-      alert("Erreur lors de l'ajout.");
-    }
+  e.preventDefault();
+
+  // On prépare les données à envoyer (sans module, filiere, niveau)
+  const payload = {
+    type_seance: formData.type_seance,
+    matiere: formData.matiere, // ✅ ID requis
+    salle: formData.salle,
+    jour: formData.jour,
+    heure_debut: formData.heure_debut,
+    heure_fin: formData.heure_fin,
+    date_debut: formData.date_debut,
+    date_fin: formData.date_fin,
   };
+
+  try {
+    if (editingId) {
+      await api.put(`seances/${editingId}/`, payload);
+      alert('Séance modifiée avec succès !');
+    } else {
+      await api.post('seances/', payload);
+      alert('Séance ajoutée avec succès !');
+    }
+
+    // Réinitialisation
+    setFormData({
+      type_seance: 'Cours',
+      matiere: '',
+      salle: '',
+      filiere: '',
+      niveau: '',
+      jour: 'Lundi',
+      heure_debut: '',
+      heure_fin: '',
+      date_debut: '',
+      date_fin: '',
+    });
+    setEditingId(null);
+    setShowForm(false);
+    fetchSeances();
+  } catch (error) {
+    console.error('Erreur :', error.response?.data || error.message);
+    alert("Erreur lors de l'enregistrement.");
+  }
+};
+
+
+ 
+ const handleEdit = (seance) => {
+  setFormData({
+    type_seance: seance.type_seance,
+    matiere: seance.matiere, // ✅ ID attendu
+    salle: seance.salle,
+    filiere: '', // facultatif, juste pour affichage
+    niveau: '',
+    jour: seance.jour,
+    heure_debut: seance.heure_debut,
+    heure_fin: seance.heure_fin,
+    date_debut: seance.date_debut,
+    date_fin: seance.date_fin,
+  });
+  setEditingId(seance.id);
+  setShowForm(true);
+};
+
+
+const handleDelete = async (id) => {
+  if (window.confirm("Confirmer la suppression de cette séance ?")) {
+    try {
+      await api.delete(`seances/${id}/`);
+      alert("Séance supprimée !");
+      fetchSeances(); // 🔄 recharge la liste
+    } catch (error) {
+      console.error("Erreur suppression :", error);
+      alert("Erreur lors de la suppression.");
+    }
+  }
+};
+
   const getFiliereNom = (id) => {
   const f = filieres.find(f => f.id === id);
   return f ? f.nom : '—';
@@ -97,6 +155,7 @@ const getNiveauNom = (id) => {
 
   return (
     <div className="seance-container">
+      <Navbar/>
       <h2 className="seance-title">Mes séances planifiées</h2>
 
       <button
@@ -162,6 +221,7 @@ const getNiveauNom = (id) => {
               <th>Filière</th>
               <th>Niveau</th>
               <th>Période</th>
+              <th>Action</th>
             </tr>
           </thead>
           <tbody>
@@ -174,6 +234,10 @@ const getNiveauNom = (id) => {
                 <td>{s.filiere}</td>
                 <td>{s.niveau}</td>
                 <td>{s.date_debut} → {s.date_fin}</td>
+                <td>
+                  <button className="edit-btn" onClick={() => handleEdit(s)}>Modifier</button>
+                  <button className="delete-btn" onClick={() => handleDelete(s.id)}>Supprimer</button>
+                </td>
               </tr>
             ))}
           </tbody>

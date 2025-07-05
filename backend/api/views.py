@@ -2,12 +2,15 @@ from rest_framework import generics, status, serializers, viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.contrib.auth import  update_session_auth_hash
-from .models import Enseignant,PendingEnseignant,Etudiant, HelpRequest,Salle, Presence, QRNotification, Session, Filiere, Niveau, Matiere
-from .serializers import EnseignantSignupSerializer, CustomTokenObtainPairSerializer, EtudiantRegisterSerializer, PendingEnseignantSerializer, SessionSerializer, PasswordSerializer, EmailSerializer, HelpRequestSerializer, PresenceSerializer, FiliereSerializer, MatiereSerializer, NiveauSerializer, EnseignantSerializer, EnseignantCreateUpdateSerializer, EnseignantListSerializer, SalleSerializer
+from .models import Enseignant,Etudiant, HelpRequest,Salle, Presence, QRNotification, Session, Filiere, Niveau, Matiere
+from .serializers import EnseignantSignupSerializer, CustomTokenObtainPairSerializer, EtudiantRegisterSerializer, SessionSerializer, PasswordSerializer, EmailSerializer, HelpRequestSerializer, PresenceSerializer, FiliereSerializer, MatiereSerializer, NiveauSerializer, EnseignantSerializer, EnseignantCreateUpdateSerializer, EnseignantListSerializer, SalleSerializer
 from .serializers import EtudiantSerializer
 import qrcode
 import re
+from django.utils.dateparse import parse_date
+import csv
 from django.core.files import File
+from openpyxl.chart import BarChart, Reference
 from io import BytesIO
 from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
 from rest_framework.exceptions import AuthenticationFailed
@@ -52,7 +55,7 @@ class EnseignantSignupView(generics.CreateAPIView):
             
             return Response(
                 {
-                    "message": "Compte créé avec succès - En attente de validation admin",
+                    "message": "Compte créé avec succès . Vous pouvez maintenant vous connecter.",
                     "statut": enseignant.statut
                 },
                 status=status.HTTP_201_CREATED
@@ -264,9 +267,13 @@ def enregistrer_presence_scan(request):
     except Session.DoesNotExist:
         return Response({"error": "Session introuvable"}, status=404)
 
-    now = timezone.now()
-    if now.date() != session.date_debut or not (session.heure_debut <= now.time() <= session.heure_fin):
-        return Response({"error": "La séance n'est pas en cours actuellement"}, status=400)
+    # Vérifie que la date actuelle est dans la plage [date_debut, date_fin]
+    if not (session.date_debut <= now.date() <= (session.date_fin or session.date_debut)):
+        return Response({"error": "La séance n'est pas programmée pour aujourd'hui."}, status=400)
+
+    # Vérifie que l'heure actuelle est dans la plage horaire
+    if not (session.heure_debut <= now.time() <= session.heure_fin):
+        return Response({"error": "La séance n'est pas en cours à cette heure."}, status=400)
 
     etudiant = user.etudiant
 
@@ -466,120 +473,137 @@ class PasswordAPI(APIView):
             return Response({'status': 'Password updated'})
         return Response(serializer.errors, status=400)
 
-# rapport cote enseignant mais mzl majrbto ki tayba 7alty wyami
+# rapport cote enseignant 
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from django.http import HttpResponse
+from datetime import datetime
+from io import BytesIO
+from openpyxl import Workbook
+from openpyxl.chart import BarChart, Reference
+import pandas as pd
 
-@api_view(['GET'])
-def generer_rapport_presence(request):
-    user = request.user
-    if not hasattr(user, 'enseignant'):
-        return Response({"error": "Accès réservé aux enseignants"}, status=403)
+class ExportRapportAbsencesEnseignant(APIView):
+    permission_classes = [IsAuthenticated]
 
-    filiere_id = request.GET.get('filiere')
-    niveau_id = request.GET.get('niveau')
-    mois = request.GET.get('mois')  # format "2025-07"
+    def get(self, request):
+        user = request.user
 
-    if not filiere_id or not niveau_id or not mois:
-        return Response({"error": "filiere, niveau et mois sont requis"}, status=400)
+        
+        # 🔍 Paramètres requis
+        filiere_id = request.query_params.get('filiere_id')
+        niveau_id = request.query_params.get('niveau_id')
+        matiere_id = request.query_params.get('matiere_id')
+        date_debut = request.query_params.get('date_debut')
+        date_fin = request.query_params.get('date_fin')
 
-    try:
-        annee, mois_num = map(int, mois.split('-'))
-        date_debut = datetime(annee, mois_num, 1)
-        date_fin = datetime(annee, mois_num + 1, 1) if mois_num < 12 else datetime(annee + 1, 1, 1)
-    except:
-        return Response({"error": "Format de mois invalide. Utilisez YYYY-MM"}, status=400)
+        if not all([filiere_id, niveau_id, matiere_id, date_debut, date_fin]):
+            return Response({"error": "Tous les paramètres sont requis."}, status=400)
 
-    sessions = Session.objects.filter(
-        enseignant=user,
-        matiere__filiere_id=filiere_id,
-        matiere__niveau_id=niveau_id,
-        date_debut__gte=date_debut,
-        date_debut__lt=date_fin
-    ).order_by('date_debut')
+        try:
+            date_debut = datetime.strptime(date_debut, "%Y-%m-%d").date()
+            date_fin = datetime.strptime(date_fin, "%Y-%m-%d").date()
+        except ValueError:
+            return Response({"error": "Format de date invalide. Utilisez YYYY-MM-DD."}, status=400)
 
-    etudiants = Etudiant.objects.filter(filiere_id=filiere_id, niveau_id=niveau_id).order_by('nom', 'prenom')
+        # 🔎 Filtrage des séances
+        sessions = Session.objects.filter(
+            enseignant=request.user,
+            matiere_id=matiere_id,
+            date_debut__gte=date_debut,
+            date_fin__lte=date_fin
+        ).select_related('matiere', 'salle')
 
-    rapport = []
-    for etudiant in etudiants:
-        ligne = {
-            "nom": etudiant.nom,
-            "prenom": etudiant.prenom,
-            "presences": []
-        }
+        if not sessions.exists():
+            return Response({"error": "Aucune séance trouvée pour cette période."}, status=404)
+
+        matiere = sessions.first().matiere
+        filiere = matiere.filiere
+        niveau = matiere.niveau
+
+        # 👥 Étudiants concernés
+        etudiants = Etudiant.objects.filter(
+            filiere=filiere,
+            niveau=niveau
+        ).select_related('user').order_by('nom', 'prenom')
+
+        # 📊 Données d'absences
+        absences_data = []
         for session in sessions:
-            present = Presence.objects.filter(etudiant=etudiant, session=session).exists()
-            ligne["presences"].append({
-                "date": session.date_debut.strftime('%Y-%m-%d'),
-                "module": session.matiere.nom,
-                "status": "Présent" if present else "Absent"
-            })
-        rapport.append(ligne)
+            presences = Presence.objects.filter(session=session)
+            presents_ids = set(p.etudiant_id for p in presences)
 
-    return Response({
-        "enseignant": f"{user.prenom} {user.nom}",
-        "filiere": sessions.first().matiere.filiere.nom if sessions else "",
-        "niveau": sessions.first().matiere.niveau.nom if sessions else "",
-        "mois": mois,
-        "rapport": rapport
-    })
-@api_view(['GET'])
-def telecharger_rapport_excel(request):
-    user = request.user
-    if not hasattr(user, 'enseignant'):
-        return Response({"error": "Accès réservé aux enseignants"}, status=403)
+            for etudiant in etudiants:
+                absent = etudiant.id not in presents_ids
+                if absent:
+                    absences_data.append({
+                        'Nom': etudiant.nom,
+                        'Prénom': etudiant.prenom,
+                        'Module': session.matiere.nom,
+                        'Type': session.type_seance,
+                        'Date': session.date_debut.strftime('%d/%m/%Y'),
+                        'Heure': f"{session.heure_debut.strftime('%H:%M')} - {session.heure_fin.strftime('%H:%M')}",
+                        'Salle': session.salle.nom,
+                        'Justifiée': 'Non'
+                    })
 
-    filiere_id = request.GET.get('filiere')
-    niveau_id = request.GET.get('niveau')
-    mois = request.GET.get('mois')  # format "2025-07"
+        # 📘 Création du fichier Excel
+        wb = Workbook()
+        wb.remove(wb.active)
 
-    if not filiere_id or not niveau_id or not mois:
-        return Response({"error": "filiere, niveau et mois sont requis"}, status=400)
+        # Feuille 1 : Étudiants
+        ws_etudiants = wb.create_sheet("Étudiants")
+        ws_etudiants.append(["Nom", "Prénom", "Email"])
+        for e in etudiants:
+            email = e.user.email if hasattr(e, 'user') and e.user else ''
+            ws_etudiants.append([e.nom, e.prenom, email])
 
-    try:
-        annee, mois_num = map(int, mois.split('-'))
-        date_debut = datetime(annee, mois_num, 1)
-        date_fin = datetime(annee, mois_num + 1, 1) if mois_num < 12 else datetime(annee + 1, 1, 1)
-    except:
-        return Response({"error": "Format de mois invalide. Utilisez YYYY-MM"}, status=400)
+        # Feuille 2 : Absences
+        ws_absences = wb.create_sheet("Absences")
+        if absences_data:
+            ws_absences.append(list(absences_data[0].keys()))
+            for row in absences_data:
+                ws_absences.append(list(row.values()))
+        else:
+            ws_absences.append(["Aucune absence enregistrée."])
 
-    sessions = Session.objects.filter(
-        enseignant=user,
-        matiere__filiere_id=filiere_id,
-        matiere__niveau_id=niveau_id,
-        date_debut__gte=date_debut,
-        date_debut__lt=date_fin
-    ).order_by('date_debut')
+        # Feuille 3 : Statistiques + Graphique
+        ws_stats = wb.create_sheet("Statistiques")
+        if absences_data:
+            df = pd.DataFrame(absences_data)
+            stats = df.groupby('Module').size().reset_index(name='Total Absences')
+            stats['Taux Absence (%)'] = (stats['Total Absences'] / len(etudiants) * 100).round(2)
 
-    etudiants = Etudiant.objects.filter(filiere_id=filiere_id, niveau_id=niveau_id).order_by('nom', 'prenom')
+            ws_stats.append(["Module", "Total Absences", "Taux Absence (%)"])
+            for _, row in stats.iterrows():
+                ws_stats.append([row['Module'], row['Total Absences'], row['Taux Absence (%)']])
 
-    # Création du fichier Excel
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Présences"
+            # 📈 Ajouter un graphique
+            chart = BarChart()
+            chart.title = "Absences par module"
+            chart.x_axis.title = "Module"
+            chart.y_axis.title = "Total Absences"
+            data = Reference(ws_stats, min_col=2, max_col=2, min_row=1, max_row=ws_stats.max_row)
+            categories = Reference(ws_stats, min_col=1, min_row=2, max_row=ws_stats.max_row)
+            chart.add_data(data, titles_from_data=True)
+            chart.set_categories(categories)
+            ws_stats.add_chart(chart, "E2")
+        else:
+            ws_stats.append(["Aucune donnée statistique disponible."])
 
-    # En-têtes
-    headers = ["Nom", "Prénom"] + [s.date_debut.strftime('%d/%m') for s in sessions]
-    ws.append(headers)
+        # 📤 Export
+        buffer = BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
 
-    # Lignes par étudiant
-    for etudiant in etudiants:
-        ligne = [etudiant.nom, etudiant.prenom]
-        for session in sessions:
-            present = Presence.objects.filter(etudiant=etudiant, session=session).exists()
-            ligne.append("Présent" if present else "Absent")
-        ws.append(ligne)
-
-    # Préparer la réponse HTTP
-    buffer = BytesIO()
-    wb.save(buffer)
-    buffer.seek(0)
-
-    response = HttpResponse(
-        buffer,
-        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
-    filename = f"rapport_presence_{mois}.xlsx"
-    response['Content-Disposition'] = f'attachment; filename={filename}'
-    return response
+        filename = f"rapport_absences_{filiere.nom}_{niveau.nom}_{datetime.now().strftime('%Y%m%d')}.xlsx"
+        response = HttpResponse(
+            buffer.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename={filename}'
+        return response
     
 ##########Had l api katjme3 etudiant w enseignant kaysifto biha demande l admin 
 
@@ -770,34 +794,7 @@ class EnseignantViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Enseignant.objects.all()
     serializer_class = EnseignantSerializer
     
-#had la vue 3la 7sab min chi prof ydir inscription mayknch active 7ta y autoriser l admin mais ymkn ngl3ha 
-#7it ladmin asln ydir lcrud donc la tzad ens machi ta ltma ydir ghi supp
 
-class PendingEnseignantViewSet(viewsets.ModelViewSet):
-    queryset = PendingEnseignant.objects.all()
-    serializer_class = PendingEnseignantSerializer
-    permission_classes = [AllowAny]
-
-    @action(detail=True, methods=['post'])
-    def approve(self, request, pk=None):
-        pending = self.get_object()
-        
-        enseignant = Enseignant.objects.create(
-            user=pending.user,
-            nom=pending.nom,
-            prenom=pending.prenom,
-            statut=pending.statut
-        )
-
-        pending.delete()
-        return Response({'status': 'Enseignant validé et ajouté avec succès.'})
-
-    @action(detail=True, methods=['post'])
-    def reject(self, request, pk=None):
-        pending = self.get_object()
-        pending.user.delete()  # Supprimer le compte utilisateur
-        pending.delete()
-        return Response({'status': 'Demande rejetée.'})
 
 ###############Les cartes d dashbord li fihum nbr ens nbr etudiant..............
 
@@ -1073,14 +1070,23 @@ class MatiereViewSet(viewsets.ModelViewSet):
     queryset = Matiere.objects.all()
     serializer_class = MatiereSerializer
     def get_queryset(self):
+        user = self.request.user
+        queryset = Matiere.objects.all()
+
+        # Si l'utilisateur est un enseignant, filtrer ses matières
+        if hasattr(user, 'enseignant'):
+            queryset = queryset.filter(enseignant=user.enseignant)
+
+        # Filtres supplémentaires
         filiere_id = self.request.query_params.get('filiere')
         niveau_id = self.request.query_params.get('niveau')
-        queryset = Matiere.objects.all()
         if filiere_id:
             queryset = queryset.filter(filiere__id=filiere_id)
         if niveau_id:
             queryset = queryset.filter(niveau__id=niveau_id)
-        return queryset 
+
+        return queryset
+
 
 
 

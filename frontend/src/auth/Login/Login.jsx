@@ -15,7 +15,7 @@ const Login = () => {
         email: '',
         password: '',
         confirm_password: '',
-        statut: ''
+        statut: 'Professeur'
     });
     const [loginData, setLoginData] = useState({
         email: '',
@@ -27,14 +27,14 @@ const Login = () => {
     };
 
     const handleSignUp = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    if (formData.password !== formData.confirm_password) {
-        toast.error("Les mots de passe ne correspondent pas");
-        return;
-    }
+  if (formData.password !== formData.confirm_password) {
+    toast.error("Les mots de passe ne correspondent pas");
+    return;
+  }
 
-    try {
+  try {
     const response = await axios.post(
       'http://localhost:8000/api/signup/enseignant/',
       {
@@ -42,7 +42,7 @@ const Login = () => {
         nom: formData.nom,
         email: formData.email,
         password: formData.password,
-        confirm_password:formData.confirm_password,
+        confirm_password: formData.confirm_password,
         statut: formData.statut
       },
       {
@@ -53,11 +53,13 @@ const Login = () => {
     );
 
     if (response.status === 201) {
-      alert("Votre demande a été envoyée à l'administration.");
+      toast.success("Inscription réussie ! Vous pouvez maintenant vous connecter.");
+      setIsSignUpActive(false); 
+          
     }
   } catch (error) {
     console.error("Erreur d'inscription :", error.response?.data || error.message);
-    alert("Erreur lors de l'inscription.");
+  alert("Erreur : " + JSON.stringify(error.response?.data || error.message));
   }
 };
 

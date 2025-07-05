@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import Navbar from '../navbar/Navbar';
+import './CodeQr.css'
 
 const CodeQr = () => {
    const [qrUrl, setQrUrl] = useState(null);
@@ -11,16 +13,17 @@ const CodeQr = () => {
   }, []);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-white">
-      <h1 className="text-3xl font-bold mb-6 text-gray-800">QR Code de la séance</h1>
+    <div className="Qr-Code">
+      <Navbar/>
+      
       {qrUrl ? (
         <img
           src={qrUrl}
           alt="QR Code"
-          className="w-[400px] h-[400px] border-4 border-gray-300 shadow-lg"
+          className="qr-image"
         />
       ) : (
-        <p className="text-gray-500">Aucun QR code à afficher.</p>
+        <p >Aucun QR code à afficher.</p>
       )}
     </div>
   );

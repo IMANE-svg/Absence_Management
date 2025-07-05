@@ -5,10 +5,9 @@ from .views import (
     EnseignantSignupView,CustomTokenObtainPairView, GenerateQRCodeAPI,
     ProfileAPI, PasswordAPI, AdminHelpResponseView,EtudiantViewSet,
     get_absences, AdminEnseignantViewSet, QRNotificationView, FiliereViewSet, MatiereViewSet, 
-    NiveauViewSet,DashboardView, PendingEnseignantViewSet, AdminHelpListView, AdminDashboardStatsView,SalleViewSet,
-    SessionViewSet, HelpRequestAPI,ExportAbsencesReport,EnseignantReport,
-    RegisterEtudiantView, logout_view, enregistrer_presence_scan, get_student_presences,student_profile_view,generer_rapport_presence,
-    telecharger_rapport_excel
+    NiveauViewSet,DashboardView,  AdminHelpListView, AdminDashboardStatsView,SalleViewSet,
+    SessionViewSet, HelpRequestAPI,ExportRapportAbsencesEnseignant,ExportAbsencesReport,EnseignantReport,
+    RegisterEtudiantView, logout_view, enregistrer_presence_scan, get_student_presences,student_profile_view
 )
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.routers import DefaultRouter
@@ -24,7 +23,6 @@ router.register(r'admin/enseignants', AdminEnseignantViewSet, basename='admin-en
 router.register(r'filieres', FiliereViewSet)
 router.register(r'niveaux', NiveauViewSet)
 router.register(r'matieres', MatiereViewSet)
-router.register(r'pending-enseignants', PendingEnseignantViewSet, basename='pending-enseignants')
 router.register(r'seances', SessionViewSet, basename='seance')
 router.register(r'salles', SalleViewSet)
 
@@ -55,12 +53,9 @@ urlpatterns = [
 
     # Absences
     path('absences/', get_absences, name='get_absences'),
-    path('rapport-presence/', generer_rapport_presence),
-    path('rapport-excel/', telecharger_rapport_excel),
+    path('rapport-absences/',ExportRapportAbsencesEnseignant.as_view()),
 
-    # Pending enseignants
-    path('pending-enseignants/<int:pk>/validate/', PendingEnseignantViewSet.as_view({'post': 'validate'})),
-    path('pending-enseignants/<int:pk>/delete/', PendingEnseignantViewSet.as_view({'delete': 'destroy'})),
+  
 
 
     # génération rapport

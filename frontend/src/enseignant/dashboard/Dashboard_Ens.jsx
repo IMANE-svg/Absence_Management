@@ -9,9 +9,61 @@ const Dashboard_Ens = () => {
   const [loading, setLoading] = useState(true);
   const [qrUrl, setQrUrl] = useState(null);
   const [qrLoading, setQrLoading] = useState(false);
-  
+  const [showRapportForm, setShowRapportForm] = useState(false);
+const [formData, setFormData] = useState({
+  filiere: '',
+  niveau: '',
+  matiere: '',
+  date_debut: '',
+  date_fin: ''
+});
+const [filieres, setFilieres] = useState([]);
+const [niveaux, setNiveaux] = useState([]);
+const [matieres, setMatieres] = useState([]);
+const [exportLoading, setExportLoading] = useState(false);
+
+
+
 
   const token = localStorage.getItem('token');
+
+  const handleChange = async (e) => {
+  const { name, value } = e.target;
+  const updatedForm = { ...formData, [name]: value };
+  setFormData(updatedForm);
+
+  // Charger les matières dynamiquement si filière ou niveau change
+  if (name === 'filiere' || name === 'niveau') {
+    try {
+      const res = await api.get('/matieres/', {
+        params: {
+          filiere: name === 'filiere' ? value : updatedForm.filiere,
+          niveau: name === 'niveau' ? value : updatedForm.niveau
+        }
+      });
+      setMatieres(res.data);
+    } catch (err) {
+      console.error("Erreur chargement matières :", err);
+    }
+  }
+};
+useEffect(() => {
+  const fetchData = async () => {
+    try {
+      const [resFilieres, resNiveaux] = await Promise.all([
+        api.get('/filieres/'),
+        api.get('/niveaux/')
+      ]);
+      setFilieres(resFilieres.data);
+      setNiveaux(resNiveaux.data);
+    } catch (err) {
+      console.error("Erreur chargement filtres :", err);
+    }
+  };
+
+  fetchData();
+}, []);
+
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -49,9 +101,33 @@ const handleGenerateQR = async () => {
     setQrLoading(false);
   }
 };
-const handleVoirListe = () => {
-  navigate('/enseignant/liste', { state: { dashboardData } });
+const handleExport = async (e) => {
+  e.preventDefault();
+  const { filiere, niveau, matiere, date_debut, date_fin } = formData;
+
+  setExportLoading(true);
+  try {
+    const response = await api.get('/rapport-absences/', {
+      params: { filiere_id: filiere, niveau_id: niveau, matiere_id: matiere, date_debut, date_fin },
+      responseType: 'blob'
+    });
+
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'rapport_absences.xlsx');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  } catch (err) {
+    alert("Erreur lors de l'export.");
+    console.error(err);
+  } finally {
+    setExportLoading(false);
+  }
 };
+
+
   if (loading) {
     return (
       <div className="dashboard-container">
@@ -113,8 +189,36 @@ const handleVoirListe = () => {
         </div>
         
       )}
-      <button className="dashboard-button" onClick={handleVoirListe}>Voir la liste des présences</button>
+      <button className="dashboard-button" onClick={() => setShowRapportForm(true)}>
+         Générer un rapport d'absences
+      </button>
+      {showRapportForm && (
+  <form onSubmit={handleExport} className="rapport-form">
+    <select name="filiere" onChange={handleChange} value={formData.filiere} required>
+      <option value="">-- Filière --</option>
+      {filieres.map(f => <option key={f.id} value={f.id}>{f.nom}</option>)}
+    </select>
 
+    <select name="niveau" onChange={handleChange} value={formData.niveau} required>
+      <option value="">-- Niveau --</option>
+      {niveaux.map(n => <option key={n.id} value={n.id}>{n.nom}</option>)}
+    </select>
+
+    <select name="matiere" onChange={handleChange} value={formData.matiere} required>
+      <option value="">-- Matière --</option>
+      {matieres.map(m => <option key={m.id} value={m.id}>{m.nom}</option>)}
+    </select>
+
+    <label>Début :</label>
+    <input type="date" name="date_debut" onChange={handleChange} value={formData.date_debut} required />
+    <label>Fin :</label>
+    <input type="date" name="date_fin" onChange={handleChange} value={formData.date_fin} required />
+
+    <button className="dashboard-button" type="submit" disabled={exportLoading}>
+  {exportLoading ? "Export en cours..." : "Exporter"}
+</button>
+  </form>
+)}
 
     </div>
   );

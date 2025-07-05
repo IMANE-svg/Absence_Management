@@ -45,6 +45,24 @@ function Liste() {
       fetchDashboard();
     }
   }, []);
+  const exportToCSV = () => {
+  if (!etudiants.length) return;
+
+  const headers = ['Nom', 'Prénom', 'État'];
+  const rows = etudiants.map(e => [e.nom, e.prenom, e.status]);
+
+  let csvContent = "data:text/csv;charset=utf-8," 
+    + [headers, ...rows].map(e => e.join(",")).join("\n");
+
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `liste_absence_${stats.filiere}_${stats.niveau}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
 
   useEffect(() => {
     const sessionId = dashboardData?.seance_prochaine?.id;
@@ -96,6 +114,10 @@ function Liste() {
             <p><strong>Absents :</strong> {stats.absences}</p>
             <p><strong>Taux de présence :</strong> {stats.taux}%</p>
           </div>
+          <button className="export-btn" onClick={exportToCSV}>
+            Exporter en CSV
+          </button>
+
         </>
       )}
     </div>

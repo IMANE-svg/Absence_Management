@@ -2,9 +2,28 @@ import React from 'react';
 import { IonIcon } from '@ionic/react';
 import { home, people, book, settings, logOut } from 'ionicons/icons';
 import './Navbar.css';
-import { Link } from 'react-router-dom';
+import { Link , useNavigate} from 'react-router-dom';
+import axios from 'axios';
 
 const Navbar = () => {
+    const navigate = useNavigate();
+
+    const handleLogout = async () => {
+  const refresh = localStorage.getItem('refresh_token');
+
+  try {
+    if (refresh) {
+      await axios.post('/api/logout/', { refresh });
+    }
+  } catch (error) {
+    console.error("Erreur lors de la déconnexion :", error);
+  } finally {
+    // Supprimer les tokens et rediriger dans tous les cas
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    navigate('/'); // Redirection vers la page d'accueil ou de login
+  }
+};
     return (
         
             <div className="navigation">
@@ -18,7 +37,7 @@ const Navbar = () => {
 
                 <ul>
                     <li>
-                        <Link to="/">
+                        <Link to="/admin/dashboard">
                             <span className="icon">
                                 <IonIcon icon={home} />
                             </span>
@@ -62,14 +81,14 @@ const Navbar = () => {
                         </Link>
                     </li>
 
-                    <li>
-                        <Link to="/admin/Signout">
-                            <span className="icon">
-                                <IonIcon icon={logOut} />
-                            </span>
-                            <span className="title">Sign Out</span>
-                        </Link>
-                    </li>
+                    <li onClick={handleLogout} style={{ cursor: 'pointer' }}>
+                    <Link>
+                        <li onClick={handleLogout} style={{ cursor: 'pointer' }}>
+                            <span className="icon"><IonIcon icon={logOut} /></span>
+                    <span className="title">Sign Out</span>
+                        </li>
+                    </Link>
+                </li>
                 </ul>
             </div>
        

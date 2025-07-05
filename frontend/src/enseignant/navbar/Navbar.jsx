@@ -2,10 +2,29 @@ import React from 'react';
 import { IonIcon } from '@ionic/react';
 import { home, people,  settings, logOut } from 'ionicons/icons';
 import './Navbar.css';
-import { Link } from 'react-router-dom';
+import { Link , useNavigate} from 'react-router-dom';
 import { calendarOutline } from 'ionicons/icons';
+import axios from 'axios';
 
 const Navbar = () => {
+    const navigate = useNavigate();
+
+    const handleLogout = async () => {
+  const refresh = localStorage.getItem('refresh_token');
+
+  try {
+    if (refresh) {
+      await axios.post('/api/logout/', { refresh });
+    }
+  } catch (error) {
+    console.error("Erreur lors de la déconnexion :", error);
+  } finally {
+    // Supprimer les tokens et rediriger dans tous les cas
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    navigate('/'); // Redirection vers la page d'accueil ou de login
+  }
+};
     return (
         
             <div className="navigation">
@@ -62,6 +81,16 @@ const Navbar = () => {
                             </span>
                             <span className="title">Mes Séances</span>
                         </Link>
+                    </li>
+                    <li onClick={handleLogout} style={{ cursor: 'pointer' }}>
+                        <Link>
+                            <span className="icon">
+                                <IonIcon icon={logOut} />
+                            </span>
+                            <span className="title">Sign Out</span>
+                        </Link>
+                            
+                        
                     </li>
                 </ul>
             </div>
