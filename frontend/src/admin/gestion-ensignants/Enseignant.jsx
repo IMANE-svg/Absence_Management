@@ -3,6 +3,8 @@ import axios from 'axios';
 import './Enseignant.css';
 import api from '../../axiosConfig';
 import Navbar from '../navbar/Navbar';
+import { IonIcon } from '@ionic/react';
+import {  trash, create} from 'ionicons/icons';
 
 
 
@@ -183,8 +185,8 @@ const Enseignant = () => {
               <td>{ens.email}</td>
               <td>{ens.statut}</td>
               <td>
-                <button onClick={() => handleEdit(ens)}>Modifier</button>
-                <button onClick={() => handleDelete(ens.id)}>Supprimer</button>
+                <button onClick={() => handleEdit(ens)}><IonIcon icon={create} /></button>
+                <button onClick={() => handleDelete(ens.id)}><IonIcon icon={trash} /></button>
               </td>
             </tr>
           ))}

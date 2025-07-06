@@ -44,6 +44,7 @@ function Help() {
       {helpRequests.map(req => (
         <div className="help-card" key={req.id}>
           <p><strong>Enseignant :</strong> {req.enseignant}</p>
+          <p><strong>Objet :</strong> {req.subject}</p>
           <p><strong>Message :</strong> {req.message}</p>
           <p><strong>Date :</strong> {new Date(req.created_at).toLocaleString()}</p>
 

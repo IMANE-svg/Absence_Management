@@ -10,14 +10,17 @@ export interface UserInfo {
 
 
 // Dans types/types.ts
-export type PresenceItem = {
+export interface PresenceItem {
   id: number;
   matiere: string;
   date: string;
+  heure_debut: string;
+  heure_fin: string;
+  date_fin: string;
   status: string;
+  justifiee: boolean;
   scanned_at?: string;
   prof_nom: string;
   salle_nom: string;
-  salle_type: string;
-  date_fin: string;
-};
+  type_seance: string;
+}

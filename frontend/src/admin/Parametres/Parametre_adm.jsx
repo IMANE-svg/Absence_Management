@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import "./Parametre.css";
-import Navbar from "../navbar/Navbar";
 import api from "../../axiosConfig";
+import Navbar from "../navbar/Navbar";
 
-const Parametre = () => {
+const Parametre_adm = () => {
   // States pour email
   const [email, setEmail] = useState("");
   const [emailMsg, setEmailMsg] = useState("");
@@ -112,4 +112,4 @@ if (data?.error) {
   );
 };
 
-export default Parametre;
+export default Parametre_adm;

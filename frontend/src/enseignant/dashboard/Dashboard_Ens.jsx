@@ -140,7 +140,7 @@ const handleExport = async (e) => {
   return (
     <div className="dashboard-container">
       <Navbar />
-      <h2 className="dashboard-title">Bienvenue, Enseignant</h2>
+      <h2 className="dashboard-title">Bienvenue, {dashboardData?.prenom} {dashboardData?.nom}</h2>
 
       <div className="dashboard-cards">
         <div className="dashboard-card">

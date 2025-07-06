@@ -3,7 +3,7 @@ import { IonIcon } from '@ionic/react';
 import { home, people,  settings, logOut } from 'ionicons/icons';
 import './Navbar.css';
 import { Link , useNavigate} from 'react-router-dom';
-import { calendarOutline } from 'ionicons/icons';
+import { calendarOutline , helpCircleOutline} from 'ionicons/icons';
 import axios from 'axios';
 
 const Navbar = () => {
@@ -69,7 +69,7 @@ const Navbar = () => {
                     <li>
                         <Link to="/enseignant/help">
                             <span className="icon">
-                                <IonIcon icon={logOut} />
+                                <IonIcon icon={helpCircleOutline} />
                             </span>
                             <span className="title">Centre Aide</span>
                         </Link>

@@ -141,13 +141,15 @@ export default function PresenceListScreen() {
     <View style={styles.presenceItem}>
       <Text style={styles.matiere}>{item.matiere}</Text>
       <Text style={styles.date}>
-        {new Date(item.date).toLocaleDateString()} -{' '}
-        {new Date(item.date).toLocaleTimeString()} à{' '}
-        {new Date(item.date_fin).toLocaleTimeString()}
+        Date : {new Date(item.date).toLocaleDateString()}
       </Text>
-      <Text style={styles.prof}>Professeur: {item.prof_nom}</Text>
+      <Text style={styles.date}>
+        {new Date(item.date).toLocaleDateString()} - {item.heure_debut} à {item.heure_fin}
+      </Text>
+      <Text style={styles.prof}>Professeur : {item.prof_nom}</Text>
       <Text style={styles.salle}>
-        Salle: {item.salle_nom} ({item.salle_type})
+        Salle : {item.salle_nom || 'Non spécifiée'}{' '}
+  {item.type_seance ? `(${item.type_seance})` : ''}
       </Text>
       <Text
         style={[
@@ -155,7 +157,7 @@ export default function PresenceListScreen() {
           item.status === 'présent(e)' ? styles.present : styles.absent,
         ]}
       >
-        Statut: {item.status}
+        Statut : {item.status}
       </Text>
       {item.scanned_at && (
         <Text style={styles.scanTime}>

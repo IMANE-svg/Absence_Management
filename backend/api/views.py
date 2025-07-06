@@ -19,7 +19,6 @@ from rest_framework.decorators import api_view, action
 from datetime import datetime, timedelta
 from rest_framework import permissions
 from django.core.mail import send_mail
-from django.utils import timezone
 from rest_framework.generics import get_object_or_404
 import pytz
 from django.http import HttpResponse
@@ -29,15 +28,31 @@ from openpyxl import Workbook
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
 from dateutil.relativedelta import relativedelta
-from django.db.models import Q
-from django.utils import timezone
+from django.db.models import Q, Count
 from rest_framework import filters
+from openpyxl.utils.dataframe import dataframe_to_rows
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from django.utils import timezone
+from django.utils.timezone import now
+from openpyxl.styles import Font, Alignment
+import calendar
+
+
+
+
+
+
+
+
+
+
 
 ###############################L'authentification################################################
 
-#########Rani mst3mla simplejwt fiha access token w refresh token###################################
 
-#####################Signup  d lenseignant#######################################
+#####################Signup  d'enseignant#######################################
 
 class EnseignantSignupView(generics.CreateAPIView):
     queryset = Enseignant.objects.all()
@@ -66,7 +81,7 @@ class EnseignantSignupView(generics.CreateAPIView):
                 {"error": serializer.errors},
                 status=status.HTTP_400_BAD_REQUEST
             )
-##################Signup d letudiant nfs l vue dyalk mabdlt fiha walo############################
+##################Signup d'etudiant############################
 
 class RegisterEtudiantView(APIView):
     permission_classes = [AllowAny]
@@ -83,8 +98,7 @@ class RegisterEtudiantView(APIView):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-##########Hna fin bdlt: f simplejwt katkn ath b TokenObtainPair deja kunt dayra fiha ens w admin ozdt ta letudiant bach matknch repitition 
-
+##########Login
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
     permission_classes = [AllowAny]
@@ -102,7 +116,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
 ######################GENERATION DL CODE W SCAN#########################################################
 
-###########Hadi lapi d generation ka detecter la seance actuel mn les seances li 3mr lprof okatgenerer l qr code 
+#################Genenation qr code
 
 class GenerateQRCodeAPI(APIView):
     permission_classes = [IsAuthenticated]
@@ -177,7 +191,7 @@ class GenerateQRCodeAPI(APIView):
             "session_id": session.id
         })
         
-##Hadi la vue d lenseignant li kayrecuperer biha la liste dles etudiants automatiquement 3la 7sab seance li 3ndo ofiha absent par deafaut 
+######Recuperation de la liste des etudiants
         
 @api_view(['GET'])
 def get_absences(request):
@@ -267,14 +281,7 @@ def enregistrer_presence_scan(request):
     except Session.DoesNotExist:
         return Response({"error": "Session introuvable"}, status=404)
 
-    # Vérifie que la date actuelle est dans la plage [date_debut, date_fin]
-    if not (session.date_debut <= now.date() <= (session.date_fin or session.date_debut)):
-        return Response({"error": "La séance n'est pas programmée pour aujourd'hui."}, status=400)
-
-    # Vérifie que l'heure actuelle est dans la plage horaire
-    if not (session.heure_debut <= now.time() <= session.heure_fin):
-        return Response({"error": "La séance n'est pas en cours à cette heure."}, status=400)
-
+    
     etudiant = user.etudiant
 
     presence, created = Presence.objects.get_or_create(
@@ -301,6 +308,8 @@ def enregistrer_presence_scan(request):
 @api_view(['GET'])
 def get_student_presences(request):
     user = request.user
+    
+
 
     if user.role != 'etudiant':
         return Response({"error": "Accès non autorisé"}, status=403)
@@ -313,18 +322,20 @@ def get_student_presences(request):
     result = []
     for presence in presences:
         session = presence.session
+        enseignant_obj = Enseignant.objects.get(user=session.enseignant)
         result.append({
             'id': presence.id,
             'matiere': session.matiere.nom,
             'date': session.date_debut,
+            'heure_debut': session.heure_debut.strftime('%H:%M'),
+            'heure_fin': session.heure_fin.strftime('%H:%M'),
             'status': presence.status,
             'justifiee': presence.justifiee,
             'scanned_at': presence.scanned_at,
-            'enseignant': f"{session.enseignant.prenom} {session.enseignant.nom}",
-            'salle': session.salle.nom,
-            'date_fin': session.date_fin
+            'prof_nom': f"{enseignant_obj.prenom} {enseignant_obj.nom}",
+            'salle_nom': session.salle.nom if session.salle else 'Inconnue',
+            'type_seance': session.type_seance
         })
-
     return Response(result, status=200)
 
 #############Had l modele li nayd 3lih lfilm lenseignant y9dr y3mr les seances dyalo mra we7da pdt wa7ed lperiode
@@ -430,8 +441,18 @@ class DashboardView(APIView):
                 'filiere': filiere.nom,
                 'niveau': niveau.nom,
             }
+            try:
+                enseignant = user.enseignant
+                nom = enseignant.nom
+                prenom = enseignant.prenom
+            except:
+                nom = user.username or ''
+                prenom = ''
+
 
         return Response({
+            'nom': nom,
+            'prenom': prenom,
             'nb_etudiants': nb_etudiants,
             'nb_seances': nb_seances,
             'seance_prochaine': session_data,
@@ -835,17 +856,6 @@ class EtudiantViewSet(viewsets.ModelViewSet):
         return queryset    
     
 ###############rapport admin/etud
-from openpyxl import Workbook
-from openpyxl.utils.dataframe import dataframe_to_rows
-from io import BytesIO
-import pandas as pd
-from django.http import HttpResponse
-from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
-from .models import Etudiant, Presence, Filiere, Niveau, Session
-from datetime import datetime
-from dateutil.relativedelta import relativedelta
-from django.utils import timezone
 
 class ExportAbsencesReport(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
@@ -957,26 +967,6 @@ class ExportAbsencesReport(APIView):
         response['Content-Disposition'] = f'attachment; filename={filename}'
         return response
 #############################################rapport coté admin/ens#######################################
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
-from django.utils import timezone
-from django.http import HttpResponse
-import pandas as pd
-from datetime import datetime, timedelta
-from .models import Session, Enseignant, QRNotification
-from django.db.models import Count, Q
-from django.utils.timezone import now
-from django.http import HttpResponse
-from openpyxl import Workbook
-from openpyxl.styles import Font, Alignment
-from datetime import timedelta
-import calendar
-from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
-from rest_framework.response import Response
-from .models import QRNotification
-
 class EnseignantReport(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { IonIcon } from '@ionic/react';
-import { home, people, book, settings, logOut } from 'ionicons/icons';
+import { home, people, book, settings, logOut , helpCircleOutline} from 'ionicons/icons';
 import './Navbar.css';
 import { Link , useNavigate} from 'react-router-dom';
 import axios from 'axios';
@@ -71,11 +71,19 @@ const Navbar = () => {
                             <span className="title">Matière</span>
                         </Link>
                     </li>
+                    <li>
+                        <Link to="/enseignant/parametres">
+                             <span className="icon">
+                                 <IonIcon icon={settings} />
+                             </span>
+                            <span className="title">Parametres</span>
+                        </Link>
+                    </li>
 
                     <li>
                         <Link to="/admin/Help">
                             <span className="icon">
-                                <IonIcon icon={settings} />
+                                <IonIcon icon={helpCircleOutline} />
                             </span>
                             <span className="title">Help Center</span>
                         </Link>
@@ -83,10 +91,10 @@ const Navbar = () => {
 
                     <li onClick={handleLogout} style={{ cursor: 'pointer' }}>
                     <Link>
-                        <li onClick={handleLogout} style={{ cursor: 'pointer' }}>
+                        
                             <span className="icon"><IonIcon icon={logOut} /></span>
-                    <span className="title">Sign Out</span>
-                        </li>
+                            <span className="title">Sign Out</span>
+                        
                     </Link>
                 </li>
                 </ul>

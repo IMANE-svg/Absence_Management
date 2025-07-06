@@ -18,6 +18,8 @@ import Parametre from "./enseignant/Parametres/Parametre";
 import MesSeances from "./enseignant/Seance/MesSeances";
 import Signout from "./signout/Signout";
 import EditEtudiant from "./admin/gestion-etudiant/EditEtudiant";
+import Parametre_adm from "./admin/Parametres/Parametre_adm";
+
 
 function App() {
   return (
@@ -34,7 +36,7 @@ function App() {
             <Route path="/admin/matiere" element={<Matiere/>}/>
             <Route path="/admin/help" element={<Help/>}></Route>
             <Route path="/signout" element={<Signout/>}></Route>
-           
+            <Route path="/admin/parametres" element={<Parametre_adm/>}></Route>
 
             <Route path="/enseignant/dashboard" element={<Dashboard_Ens/>}></Route>
             <Route path="/enseignant/code" element={<CodeQr/>}></Route>

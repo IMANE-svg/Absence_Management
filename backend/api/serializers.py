@@ -171,6 +171,7 @@ class HelpRequestSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ['enseignant', 'etudiant', 'created_at', 'responded_at', 'resolved']
 
+
 ################Hada dl absence orah khdam f 3vues w7da dyali w 2 dyalk
 class PresenceSerializer(serializers.ModelSerializer):
     nom = serializers.CharField(source="etudiant.nom")
