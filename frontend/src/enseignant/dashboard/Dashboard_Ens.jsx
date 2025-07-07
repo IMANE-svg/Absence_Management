@@ -4,6 +4,7 @@ import Navbar from '../navbar/Navbar';
 import './Dashboard.css';
 import api from '../../axiosConfig';
 
+
 const Dashboard_Ens = () => {
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -128,14 +129,6 @@ const handleExport = async (e) => {
 };
 
 
-  if (loading) {
-    return (
-      <div className="dashboard-container">
-        <Navbar />
-        <h2 className="dashboard-title">Chargement...</h2>
-      </div>
-    );
-  }
 
   return (
     <div className="dashboard-container">
@@ -219,6 +212,7 @@ const handleExport = async (e) => {
 </button>
   </form>
 )}
+
 
     </div>
   );

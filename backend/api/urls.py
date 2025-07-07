@@ -7,8 +7,9 @@ from .views import (
     get_absences, AdminEnseignantViewSet, QRNotificationView, FiliereViewSet, MatiereViewSet, 
     NiveauViewSet,DashboardView,  AdminHelpListView, AdminDashboardStatsView,SalleViewSet,
     SessionViewSet, HelpRequestAPI,ExportRapportAbsencesEnseignant,ExportAbsencesReport,EnseignantReport,
-    RegisterEtudiantView, logout_view, enregistrer_presence_scan, get_student_presences,student_profile_view
-)
+    RegisterEtudiantView, logout_view, enregistrer_presence_scan, get_student_presences,
+    student_profile_view
+    )
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import(
@@ -71,7 +72,11 @@ urlpatterns = [
     path('presences/', get_student_presences, name='student_presences'),
 
     path('etudiant/profil/', student_profile_view, name='student_profile'),
+    
+   
+    
     # Routes des ViewSets via le router
+    
     path('', include(router.urls)),
     
 

@@ -16,7 +16,7 @@ const [filieres, setFilieres] = useState([]);
   const [niveaux, setNiveaux] = useState([]);
 
   const navigate = useNavigate();
-
+  
   useEffect(() => {
     const loadFilters = async () => {
       try {

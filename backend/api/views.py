@@ -38,16 +38,8 @@ from django.utils import timezone
 from django.utils.timezone import now
 from openpyxl.styles import Font, Alignment
 import calendar
-
-
-
-
-
-
-
-
-
-
+from langchain_fireworks import ChatFireworks
+from collections import Counter, defaultdict
 
 ###############################L'authentification################################################
 
@@ -495,24 +487,47 @@ class PasswordAPI(APIView):
         return Response(serializer.errors, status=400)
 
 # rapport cote enseignant 
-from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from django.http import HttpResponse
-from datetime import datetime
-from io import BytesIO
-from openpyxl import Workbook
-from openpyxl.chart import BarChart, Reference
-import pandas as pd
+#  Nettoyage du texte IA
+def nettoyer_texte_ia(texte):
+    return re.sub(r"<think>.*?</think>", "", texte, flags=re.DOTALL).strip()
+
+# Générer un résumé IA pour l’enseignant
+def generer_resume_enseignant(absences_data, enseignant):
+    if not absences_data:
+        return "Aucune absence à analyser pour cette période."
+
+    resume = "\n".join([
+        f"- {a['Nom']} {a['Prénom']} | {a['Module']} | {a['Date']} | Justifiée : {a['Justifiée']}"
+        for a in absences_data
+    ])
+
+    prompt = f"""
+Voici les données d'absences des étudiants du module  :
+
+{resume}
+
+Analyse uniquement ces données. Fournis un résumé structuré avec :
+1. Les étudiants les plus absents
+2. Les séances ou dates critiques
+3. Des recommandations pédagogiques
+4. Une conclusion synthétique
+
+⚠️ Utilise uniquement les noms et dates présents dans les données. Ne crée pas d’exemples fictifs.
+
+Réponds en français.
+"""
+    try:
+        llm = ChatFireworks(model="accounts/fireworks/models/deepseek-r1", temperature=0.3)
+        response = llm.invoke(prompt)
+        return nettoyer_texte_ia(response.content)
+    except:
+        return "Résumé IA indisponible pour le moment."
 
 class ExportRapportAbsencesEnseignant(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         user = request.user
-
-        
-        # 🔍 Paramètres requis
         filiere_id = request.query_params.get('filiere_id')
         niveau_id = request.query_params.get('niveau_id')
         matiere_id = request.query_params.get('matiere_id')
@@ -528,9 +543,8 @@ class ExportRapportAbsencesEnseignant(APIView):
         except ValueError:
             return Response({"error": "Format de date invalide. Utilisez YYYY-MM-DD."}, status=400)
 
-        # 🔎 Filtrage des séances
         sessions = Session.objects.filter(
-            enseignant=request.user,
+            enseignant=user,
             matiere_id=matiere_id,
             date_debut__gte=date_debut,
             date_fin__lte=date_fin
@@ -543,21 +557,18 @@ class ExportRapportAbsencesEnseignant(APIView):
         filiere = matiere.filiere
         niveau = matiere.niveau
 
-        # 👥 Étudiants concernés
         etudiants = Etudiant.objects.filter(
             filiere=filiere,
             niveau=niveau
         ).select_related('user').order_by('nom', 'prenom')
 
-        # 📊 Données d'absences
         absences_data = []
         for session in sessions:
             presences = Presence.objects.filter(session=session)
             presents_ids = set(p.etudiant_id for p in presences)
 
             for etudiant in etudiants:
-                absent = etudiant.id not in presents_ids
-                if absent:
+                if etudiant.id not in presents_ids:
                     absences_data.append({
                         'Nom': etudiant.nom,
                         'Prénom': etudiant.prenom,
@@ -569,18 +580,23 @@ class ExportRapportAbsencesEnseignant(APIView):
                         'Justifiée': 'Non'
                     })
 
-        # 📘 Création du fichier Excel
+        # Grouper les absences par étudiant
+        absences_par_etudiant = defaultdict(list)
+        for absence in absences_data:
+            key = (absence['Nom'], absence['Prénom'])
+            absences_par_etudiant[key].append(absence)
+
         wb = Workbook()
         wb.remove(wb.active)
 
-        # Feuille 1 : Étudiants
+        # Feuille Étudiants
         ws_etudiants = wb.create_sheet("Étudiants")
         ws_etudiants.append(["Nom", "Prénom", "Email"])
         for e in etudiants:
             email = e.user.email if hasattr(e, 'user') and e.user else ''
             ws_etudiants.append([e.nom, e.prenom, email])
 
-        # Feuille 2 : Absences
+        # Feuille Absences
         ws_absences = wb.create_sheet("Absences")
         if absences_data:
             ws_absences.append(list(absences_data[0].keys()))
@@ -589,7 +605,7 @@ class ExportRapportAbsencesEnseignant(APIView):
         else:
             ws_absences.append(["Aucune absence enregistrée."])
 
-        # Feuille 3 : Statistiques + Graphique
+        # Feuille Statistiques
         ws_stats = wb.create_sheet("Statistiques")
         if absences_data:
             df = pd.DataFrame(absences_data)
@@ -600,7 +616,6 @@ class ExportRapportAbsencesEnseignant(APIView):
             for _, row in stats.iterrows():
                 ws_stats.append([row['Module'], row['Total Absences'], row['Taux Absence (%)']])
 
-            # 📈 Ajouter un graphique
             chart = BarChart()
             chart.title = "Absences par module"
             chart.x_axis.title = "Module"
@@ -613,7 +628,37 @@ class ExportRapportAbsencesEnseignant(APIView):
         else:
             ws_stats.append(["Aucune donnée statistique disponible."])
 
-        # 📤 Export
+        # Résumé IA
+        texte_ia = generer_resume_enseignant(absences_data, user)
+        ws_ia = wb.create_sheet("Résumé IA")
+        ws_ia["A1"] = "Analyse IA personnalisée"
+        ws_ia["A1"].font = Font(bold=True, size=14)
+        for i, ligne in enumerate(texte_ia.splitlines(), start=2):
+            ws_ia[f"A{i}"] = ligne
+            ws_ia[f"A{i}"].alignment = Alignment(wrap_text=True)
+
+        #  Étudiants à risque
+        compteur = Counter((a['Nom'], a['Prénom']) for a in absences_data if a['Justifiée'] == 'Non')
+        ws_risque = wb.create_sheet("Étudiants à risque")
+        ws_risque.append(["Nom", "Prénom", "Absences non justifiées"])
+        for (nom, prenom), total in compteur.items():
+            if total >= 3:
+                ws_risque.append([nom, prenom, total])
+
+        #  Feuilles individuelles pour chaque étudiant
+        for (nom, prenom), absences in absences_par_etudiant.items():
+            feuille_nom = f"{nom}_{prenom}"[:31]  # max 31 caractères
+            ws_indiv = wb.create_sheet(title=feuille_nom)
+            ws_indiv.append(["Module", "Type", "Date", "Heure", "Salle", "Justifiée"])
+            for a in absences:
+                ws_indiv.append([a['Module'], a['Type'], a['Date'], a['Heure'], a['Salle'], a['Justifiée']])
+            ws_indiv.append([])
+            ws_indiv.append(["Résumé :"])
+            ws_indiv.append([f"Total absences : {len(absences)}"])
+            non_just = sum(1 for a in absences if a['Justifiée'] == 'Non')
+            ws_indiv.append([f"Absences non justifiées : {non_just}"])
+
+        # Export
         buffer = BytesIO()
         wb.save(buffer)
         buffer.seek(0)
@@ -625,7 +670,6 @@ class ExportRapportAbsencesEnseignant(APIView):
         )
         response['Content-Disposition'] = f'attachment; filename={filename}'
         return response
-    
 ##########Had l api katjme3 etudiant w enseignant kaysifto biha demande l admin 
 
 class HelpRequestAPI(APIView):
@@ -856,132 +900,239 @@ class EtudiantViewSet(viewsets.ModelViewSet):
         return queryset    
     
 ###############rapport admin/etud
+# Nettoyage du texte IA 
+def nettoyer_texte_ia(self, texte):
+    texte = re.sub(r"<think>.*?</think>", "", texte, flags=re.DOTALL)
+    texte = re.sub(r"<\|.*?\|>", "", texte)
+    texte = re.sub(r"\n{3,}", "\n\n", texte)  # réduit les sauts de ligne excessifs
+    texte = texte.lstrip("\n")  # supprime les sauts de ligne en début de texte
+    return texte.strip()
+
+
+# Générer un résumé IA global
+def generer_resume_ia(absences_data, etudiants):
+    if not absences_data:
+        return "Aucune absence détectée. Impossible de générer une analyse IA pertinente."
+
+    resume = "\n".join([
+        f"{a['Nom']} {a['Prénom']} | {a['Module']} | {a['Date']} | Justifiée : {a['Justifiée']}"
+        for a in absences_data
+    ])
+
+    prompt = f"""
+Voici les données d'absences des étudiants (nom, module, date, justification) :
+
+{resume}
+
+Analyse uniquement ces données. Génère un résumé clair pour l’administration avec :
+1. Les modules les plus touchés (avec le nombre exact d’absences)
+2. Les étudiants les plus absents (avec leur total d’absences)
+3. Des recommandations concrètes
+4. Une conclusion synthétique
+
+⚠️ Utilise uniquement les noms et matieres présents dans les données. Ne crée pas d’exemples fictifs.
+
+Réponds en français.
+"""
+    try:
+        llm = ChatFireworks(model="accounts/fireworks/models/deepseek-r1", temperature=0.3)
+        response = llm.invoke(prompt)
+        return nettoyer_texte_ia(response.content)
+    except Exception:
+        return "Résumé IA indisponible pour le moment."
+
 
 class ExportAbsencesReport(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
 
+    def nettoyer_texte_ia(self, texte):
+        texte = re.sub(r"<think>.*?</think>", "", texte, flags=re.DOTALL)
+        texte = re.sub(r"<\|.*?\|>", "", texte)
+        return texte.strip()
+
+    def generer_resume_ia(self, absences_data):
+        if not absences_data:
+            return "Aucune absence détectée. Impossible de générer une analyse IA pertinente."
+
+        resume = "\n".join([
+            f"{a['Nom']} {a['Prénom']} | {a['Module']} | {a['Date']} | Justifiée : {a['Justifiée']}"
+            for a in absences_data
+        ])
+
+        prompt = f"""
+Voici les données d'absences des étudiants (nom, module, date, justification) :
+
+{resume}
+
+Analyse uniquement ces données. Génère un résumé clair pour l’administration avec :
+1. Les modules les plus touchés (avec le nombre exact d’absences)
+2. Les étudiants les plus absents (avec leur total d’absences)
+3. Des recommandations concrètes
+4. Une conclusion synthétique
+
+⚠️ Utilise uniquement les noms et matières présents dans les données. Ne crée pas d’exemples fictifs.
+
+Réponds en français.
+"""
+        try:
+            llm = ChatFireworks(model="accounts/fireworks/models/deepseek-r1", temperature=0.3)
+            response = llm.invoke(prompt)
+            return self.nettoyer_texte_ia(response.content)
+        except:
+            return "Résumé IA indisponible pour le moment."
+
     def get(self, request):
-        # 1. Récupérer les paramètres
         filiere_id = request.query_params.get('filiere')
         niveau_id = request.query_params.get('niveau')
-        mois = request.query_params.get('mois')  # Optionnel (ex: "2024-07")
+        mois = request.query_params.get('mois')
 
-        # Validation des paramètres obligatoires
         if not filiere_id or not niveau_id:
-            return Response(
-                {"error": "Les paramètres 'filiere' et 'niveau' sont requis."},
-                status=400
-            )
+            return Response({"error": "Les paramètres 'filiere' et 'niveau' sont requis."}, status=400)
 
         try:
             filiere = Filiere.objects.get(id=filiere_id)
             niveau = Niveau.objects.get(id=niveau_id)
         except (Filiere.DoesNotExist, Niveau.DoesNotExist):
-            return Response(
-                {"error": "Filière ou niveau introuvable."},
-                status=404
-            )
+            return Response({"error": "Filière ou niveau introuvable."}, status=404)
 
-        # 2. Filtrer les absences
-        absences = Presence.objects.filter(
-            etudiant__filiere=filiere.nom,
-            etudiant__niveau=niveau.nom,
-            status='absent(e)'  # ou `justifiee=False` pour les non-justifiées
-        ).select_related('etudiant', 'session', 'session__matiere', 'session__salle')
+        sessions = Session.objects.filter(
+            matiere__filiere=filiere,
+            matiere__niveau=niveau
+        ).select_related('matiere', 'salle')
 
-        # Filtrer par mois si spécifié
         if mois:
             try:
                 annee, mois_num = map(int, mois.split('-'))
                 date_debut = datetime(annee, mois_num, 1)
                 date_fin = date_debut + relativedelta(months=1)
-                absences = absences.filter(date__gte=date_debut, date__lt=date_fin)
+                sessions = sessions.filter(date_debut__gte=date_debut, date_debut__lt=date_fin)
             except ValueError:
-                return Response(
-                    {"error": "Format de mois invalide. Utilisez YYYY-MM."},
-                    status=400
-                )
+                return Response({"error": "Format de mois invalide. Utilisez YYYY-MM."}, status=400)
 
-        # 3. Préparer les données
-        # Liste des étudiants
         etudiants = Etudiant.objects.filter(
             filiere=filiere.nom,
             niveau=niveau.nom
-        ).values('nom', 'prenom', 'user__email')  # Ajoutez 'apogee' si disponible
+        ).select_related('user')
 
-        # Détail des absences
         absences_data = []
-        for absence in absences:
-            absences_data.append({
-                'Nom': absence.etudiant.nom,
-                'Prénom': absence.etudiant.prenom,
-                'Module': absence.session.matiere.nom,
-                'Type': absence.session.type_seance,
-                'Date': absence.date.strftime('%d/%m/%Y'),
-                'Heure': f"{absence.session.heure_debut.strftime('%H:%M')} - {absence.session.heure_fin.strftime('%H:%M')}",
-                'Salle': absence.session.salle.nom,
-                'Justifiée': 'Oui' if absence.justifiee else 'Non'
-            })
+        for session in sessions:
+            presences = Presence.objects.filter(session=session, status='present(e)')
+            presents_ids = set(p.etudiant_id for p in presences)
 
-        # 4. Générer le fichier Excel
+            for etudiant in etudiants:
+                if etudiant.id not in presents_ids:
+                    absences_data.append({
+                        'Nom': etudiant.nom,
+                        'Prénom': etudiant.prenom,
+                        'Module': session.matiere.nom,
+                        'Type': session.type_seance,
+                        'Date': session.date_debut.strftime('%d/%m/%Y'),
+                        'Heure': f"{session.heure_debut.strftime('%H:%M')} - {session.heure_fin.strftime('%H:%M')}",
+                        'Salle': session.salle.nom,
+                        'Justifiée': 'Non',
+                        'EtudiantID': etudiant.id
+                    })
+
+        # Création du fichier Excel
         wb = Workbook()
-        wb.remove(wb.active)  # Supprimer la feuille par défaut
+        wb.remove(wb.active)
 
-        # Feuille 1: Liste des étudiants
+        # Feuille Étudiants
         ws_etudiants = wb.create_sheet("Étudiants")
-        ws_etudiants.append(["Nom", "Prénom", "Email"])  # Ajoutez "Apogée" si nécessaire
-        for etudiant in etudiants:
-            ws_etudiants.append([etudiant['nom'], etudiant['prenom'], etudiant['user__email']])
+        ws_etudiants.append(["Nom", "Prénom", "Email"])
+        for e in etudiants:
+            ws_etudiants.append([e.nom, e.prenom, e.user.email if e.user else ""])
 
-        # Feuille 2: Absences
+        # Feuille Absences
+        ws_absences = wb.create_sheet("Absences")
         if absences_data:
-            ws_absences = wb.create_sheet("Absences")
-            ws_absences.append(list(absences_data[0].keys()))
-            for absence in absences_data:
-                ws_absences.append(list(absence.values()))
+            ws_absences.append(list(absences_data[0].keys())[:-1])
+            for row in absences_data:
+                ws_absences.append([row[k] for k in list(row.keys())[:-1]])
         else:
-            ws_absences = wb.create_sheet("Absences")
             ws_absences.append(["Aucune absence trouvée pour les critères sélectionnés."])
 
-        # Feuille 3: Statistiques (si des absences existent)
-        if absences_data:
-            df_absences = pd.DataFrame(absences_data)
-            stats = df_absences.groupby('Module').size().reset_index(name='Total Absences')
-            stats['Taux Absence (%)'] = (stats['Total Absences'] / len(etudiants) * 100)
+        # Résumé IA global
+        texte_ia = self.generer_resume_ia(absences_data)
+        print("Résumé IA généré :", texte_ia)
+        ws_ia = wb.create_sheet("Résumé IA")
+        ws_ia["A1"] = "Analyse générée par l'IA"
+        ws_ia["A1"].font = Font(bold=True, size=14)
+        if texte_ia.strip():
+            lignes = [l.strip() for l in texte_ia.splitlines() if l.strip()]
+            for i, ligne in enumerate(lignes, start=2):
+                ws_ia[f"A{i}"] = ligne
+                ws_ia[f"A{i}"].alignment = Alignment(wrap_text=True, vertical="top")
+                ws_ia.column_dimensions["A"].width = 100
+        else:
+                ws_ia["A2"] = "Résumé IA vide ou non généré."
+                ws_ia["A2"].alignment = Alignment(wrap_text=True, vertical="top")
+                
 
-            ws_stats = wb.create_sheet("Statistiques")
-            ws_stats.append(["Module", "Total Absences", "Taux Absence (%)"])
-            for _, row in stats.iterrows():
-                ws_stats.append([row['Module'], row['Total Absences'], round(row['Taux Absence (%)'], 2)])
+        # Feuilles individuelles par étudiant
+        absences_par_etudiant = defaultdict(lambda: defaultdict(int))
+        total_seances_par_module = defaultdict(int)
 
-        # 5. Retourner le fichier
+        for session in sessions:
+            total_seances_par_module[session.matiere.nom] += 1
+
+        for a in absences_data:
+            absences_par_etudiant[(a['Nom'], a['Prénom'])][a['Module']] += 1
+
+        total_seances = sum(total_seances_par_module.values())
+
+        for etu in etudiants:
+            key = (etu.nom, etu.prenom)
+            ws_etu = wb.create_sheet(f"{etu.nom}_{etu.prenom}"[:31])
+            ws_etu.append(["Module", "Absences non justifiées", "Total séances", "Taux d'absence (%)"])
+            total_abs = 0
+            for module, total_seance in total_seances_par_module.items():
+                nb_abs = absences_par_etudiant[key].get(module, 0)
+                taux = (nb_abs / total_seance * 100) if total_seance > 0 else 0
+                total_abs += nb_abs
+                ws_etu.append([module, nb_abs, total_seance, round(taux, 2)])
+            taux_global = (total_abs / total_seances * 100) if total_seances > 0 else 0
+            ws_etu.append([])
+            ws_etu.append(["", "Taux global d'absence non justifiée (%)", round(taux_global, 2)])
+
+        # Étudiants à risque
+        ws_risque = wb.create_sheet("Étudiants à risque")
+        ws_risque.append(["Nom", "Prénom", "Absences non justifiées", "Total séances", "Taux global d'absence (%)"])
+        for (nom, prenom), modules in absences_par_etudiant.items():
+            total_abs = sum(modules.values())
+            taux_global = (total_abs / total_seances * 100) if total_seances > 0 else 0
+            if taux_global > 40:
+                ws_risque.append([nom, prenom, total_abs, total_seances, round(taux_global, 2)])
+
+        # Export final
         buffer = BytesIO()
         wb.save(buffer)
         buffer.seek(0)
 
-        filename = f"absences_{filiere.nom}_{niveau.nom}_{timezone.now().strftime('%Y%m%d')}.xlsx"
-        response = HttpResponse(
+        filename = f"absences_{filiere.nom}_{niveau.nom}_{timezone_now().strftime('%Y%m%d')}.xlsx"
+        return HttpResponse(
             buffer.getvalue(),
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            headers={'Content-Disposition': f'attachment; filename={filename}'}
         )
-        response['Content-Disposition'] = f'attachment; filename={filename}'
-        return response
 #############################################rapport coté admin/ens#######################################
+#  Nettoyage du texte IA
+def nettoyer_texte_ia(texte):
+    texte = re.sub(r"<think>.*?</think>", "", texte, flags=re.DOTALL)
+    return texte.strip()
+
 class EnseignantReport(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
 
     def get(self, request):
-        periode = request.query_params.get('periode', 'mois')  # 'mois' ou 'semestre'
+        periode = request.query_params.get('periode', 'mois')
         today = now().date()
 
         if periode == 'mois':
             start_date = today.replace(day=1)
             end_date = today
         elif periode == 'semestre':
-            if today.month <= 6:
-                start_date = today.replace(month=1, day=1)
-            else:
-                start_date = today.replace(month=7, day=1)
+            start_date = today.replace(month=1 if today.month <= 6 else 7, day=1)
             end_date = today
         else:
             return Response({"error": "Période invalide"}, status=400)
@@ -989,18 +1140,17 @@ class EnseignantReport(APIView):
         qrs = QRNotification.objects.filter(
             created_at__date__gte=start_date,
             created_at__date__lte=end_date
-        ).select_related('enseignant', 'session', 'session__matiere', 'session__salle', 
-                        'session__matiere__filiere', 'session__matiere__niveau')
+        ).select_related(
+            'enseignant', 'session', 'session__matiere', 'session__salle',
+            'session__matiere__filiere', 'session__matiere__niveau'
+        )
 
-        # Organiser par enseignant
         enseignants_dict = {}
         for qr in qrs:
-            key = qr.enseignant
-            enseignants_dict.setdefault(key, []).append(qr)
+            enseignants_dict.setdefault(qr.enseignant, []).append(qr)
 
-        # Création fichier Excel
         wb = Workbook()
-        wb.remove(wb.active)  # Retirer la feuille par défaut
+        wb.remove(wb.active)
 
         for enseignant, qr_list in enseignants_dict.items():
             ws = wb.create_sheet(title=f"{enseignant.nom}_{enseignant.prenom}"[:30])
@@ -1012,13 +1162,11 @@ class EnseignantReport(APIView):
             cell.font = Font(size=14, bold=True)
             cell.alignment = Alignment(horizontal='center')
 
-            # En-têtes
             headers = ['Date QR', 'Heure début', 'Heure fin', 'Matière', 'Type séance', 'Filière', 'Niveau', 'Salle']
             ws.append(headers)
             for cell in ws[2]:
                 cell.font = Font(bold=True)
 
-            # Données
             for qr in qr_list:
                 session = qr.session
                 matiere = session.matiere
@@ -1033,7 +1181,101 @@ class EnseignantReport(APIView):
                     session.salle.nom
                 ])
 
-        # Préparer la réponse HTTP
+            # Résumé IA par enseignant
+            resume = "\n".join([
+                f"{qr.created_at.date().strftime('%d/%m/%Y')} – {qr.session.matiere.nom} ({qr.session.type_seance})"
+                for qr in qr_list
+            ])
+
+            prompt = f"""
+Voici les séances de l'enseignant {enseignant.nom} {enseignant.prenom} :
+
+{resume}
+
+Rédige un résumé professionnel sur son activité :
+- Fréquence des QR codes
+- Modules enseignés
+- Régularité des séances
+- Recommandations éventuelles
+
+Réponds en français.
+"""
+            try:
+                texte_ia = ChatFireworks(model="accounts/fireworks/models/deepseek-r1").invoke(prompt).content
+                texte_ia = nettoyer_texte_ia(texte_ia)
+            except:
+                texte_ia = "Résumé IA indisponible."
+
+            ws_ia = wb.create_sheet(title=f"Résumé_{enseignant.nom[:20]}")
+            ws_ia["A1"] = f"Résumé IA – Pr. {enseignant.nom} {enseignant.prenom}"
+            ws_ia["A1"].font = Font(bold=True, size=12)
+            ws_ia["A2"] = texte_ia
+            ws_ia["A2"].alignment = Alignment(wrap_text=True)
+
+        # Analyse IA globale sur les QR codes
+        try:
+            qr_counts = {
+                f"{e.nom} {e.prenom}": len(qrs)
+                for e in enseignants_dict.keys()
+            }
+            resume_qr = "\n".join([f"{nom} : {count} QR générés" for nom, count in qr_counts.items()])
+
+            prompt_global = f"""
+Voici le nombre de QR codes générés par chaque enseignant :
+
+{resume_qr}
+
+Analyse ces données :
+- Qui génère peu de QR ?
+- Y a-t-il des anomalies ?
+- Que recommanderiez-vous à l’administration ?
+
+Réponds en français.
+"""
+            interpretation = ChatFireworks(model="accounts/fireworks/models/deepseek-r1").invoke(prompt_global).content
+            interpretation = nettoyer_texte_ia(interpretation)
+        except:
+            interpretation = "Analyse IA indisponible."
+
+        ws_global = wb.create_sheet("Analyse QR IA")
+        ws_global["A1"] = "Analyse IA sur la génération de QR codes"
+        ws_global["A1"].font = Font(bold=True)
+        ws_global["A2"] = interpretation
+        ws_global["A2"].alignment = Alignment(wrap_text=True)
+
+        # Alerte IA pour enseignants inactifs
+        enseignants_actifs = set(enseignants_dict.keys())
+        enseignants_tous = Enseignant.objects.all()
+        enseignants_inactifs = [e for e in enseignants_tous if e not in enseignants_actifs]
+
+        if enseignants_inactifs:
+            noms_inactifs = "\n".join([f"{e.nom} {e.prenom}" for e in enseignants_inactifs])
+
+            prompt_inactifs = f"""
+Voici la liste des enseignants qui n'ont généré aucun QR code pendant la période :
+
+{noms_inactifs}
+
+Rédige une alerte professionnelle à destination de l’administration :
+- Pourquoi est-ce problématique ?
+- Que recommander ?
+- Ton neutre, mais ferme.
+
+Réponds en français.
+"""
+            try:
+                alerte = ChatFireworks(model="accounts/fireworks/models/deepseek-r1").invoke(prompt_inactifs).content
+                alerte = nettoyer_texte_ia(alerte)
+            except:
+                alerte = "Alerte IA indisponible."
+
+            ws_alerte = wb.create_sheet("Alerte enseignants inactifs")
+            ws_alerte["A1"] = "Alerte IA – Enseignants sans QR"
+            ws_alerte["A1"].font = Font(bold=True)
+            ws_alerte["A2"] = alerte
+            ws_alerte["A2"].alignment = Alignment(wrap_text=True)
+
+        #  Export
         response = HttpResponse(
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
@@ -1099,3 +1341,6 @@ def logout_view(request):
     except Exception as e:
         return Response({"error": str(e)}, status=500)
     
+
+
+
